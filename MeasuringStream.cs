@@ -269,57 +269,66 @@ namespace PakPatcher
 
         public void AddStream(MeasuringStream stream)
         {
-            string filePath = stream.Name;
+            lock (this)
+            {
+                string filePath = stream.Name;
 
-            var di = new DriveInfo(Path.GetPathRoot(filePath));
+                var di = new DriveInfo(Path.GetPathRoot(filePath));
 
-            var k = new DiskReportKey() { Name = di.Name, DriveType = di.DriveType };
-            GetOrAddReport(ReportsByDisk, k).AddToReport(stream);
+                var k = new DiskReportKey() { Name = di.Name, DriveType = di.DriveType };
+                GetOrAddReport(ReportsByDisk, k).AddToReport(stream);
 
-            GetOrAddReport(ReportsByPurpose, stream.Purpose).AddToReport(stream);
+                GetOrAddReport(ReportsByPurpose, stream.Purpose).AddToReport(stream);
+            }
         }
 
         public void LogReports()
         {
-            logger.Info(() =>
+            lock (this)
             {
-                StringBuilder info = new StringBuilder();
-                info.AppendLine("Report by disk");
-
-                Action<MeasuringStream.BwStat> appendStat = (MeasuringStream.BwStat s) => { info.Append($"{GetBytesReadable(s.count)}, {s.TS}, {GetBytesReadable(s.Speed, "/s")}; "); };
-
-                foreach (var p in ReportsByDisk)
+                logger.Info(() =>
                 {
-                    var r = p.Value.Read;
-                    var w = p.Value.Write;
-                    info.Append($"{p.Key.Name} ({p.Key.DriveType}): ");
-                    info.Append("r => ");
-                    appendStat(r);
-                    info.Append("w => ");
-                    appendStat(w);
-                    info.AppendLine();
-                }
-                info.AppendLine("Report by purpose");
-                foreach (var p in ReportsByPurpose)
-                {
-                    var r = p.Value.Read;
-                    var w = p.Value.Write;
-                    info.Append($"{p.Key}: ");
-                    info.Append("r => ");
-                    appendStat(r);
-                    info.Append("w => ");
-                    appendStat(w);
-                    info.AppendLine();
-                }
+                    StringBuilder info = new StringBuilder();
+                    info.AppendLine("Report by disk");
 
-                return info.ToString();
-            });
+                    Action<MeasuringStream.BwStat> appendStat = (MeasuringStream.BwStat s) => { info.Append($"{GetBytesReadable(s.count)}, {s.TS}, {GetBytesReadable(s.Speed, "/s")}; "); };
+
+                    foreach (var p in ReportsByDisk)
+                    {
+                        var r = p.Value.Read;
+                        var w = p.Value.Write;
+                        info.Append($"{p.Key.Name} ({p.Key.DriveType}): ");
+                        info.Append("r => ");
+                        appendStat(r);
+                        info.Append("w => ");
+                        appendStat(w);
+                        info.AppendLine();
+                    }
+                    info.AppendLine("Report by purpose");
+                    foreach (var p in ReportsByPurpose)
+                    {
+                        var r = p.Value.Read;
+                        var w = p.Value.Write;
+                        info.Append($"{p.Key}: ");
+                        info.Append("r => ");
+                        appendStat(r);
+                        info.Append("w => ");
+                        appendStat(w);
+                        info.AppendLine();
+                    }
+
+                    return info.ToString();
+                });
+            }
         }
 
         public void Reset()
         {
-            ReportsByDisk.Clear();
-            ReportsByPurpose.Clear();
+            lock (this)
+            {
+                ReportsByDisk.Clear();
+                ReportsByPurpose.Clear();
+            }
         }
 
 
