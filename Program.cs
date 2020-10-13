@@ -37,14 +37,17 @@ namespace PakPatcher
 
 		public static void CopyNTo(Stream src, Stream dst, long n)
 		{
-			long bufferSize = 4096;
-			byte[] buffer = new byte[bufferSize];
-			int read;
-			while (n > 0 &&
-				   (read = src.Read(buffer, 0, (int)Math.Min(bufferSize, n))) > 0)
+			if (n > 0)
 			{
-				dst.Write(buffer, 0, read);
-				n -= read;
+				long bufferSize = 4096;
+				byte[] buffer = new byte[bufferSize];
+				int read;
+				while (n > 0 &&
+					   (read = src.Read(buffer, 0, (int)Math.Min(bufferSize, n))) > 0)
+				{
+					dst.Write(buffer, 0, read);
+					n -= read;
+				}
 			}
 		}
 
@@ -707,16 +710,27 @@ namespace PakPatcher
 
 		static void TestZipCacheReplicate(string src, string dst, FileCache fc)
 		{
-			using (BufferedStream fsrc = new BufferedStream(new FileStream(src, FileMode.Open)))
+			using (MeasuringStream ms = new MeasuringStream(new FileStream(src, FileMode.Open)))
+			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.Create)))
 			{
-				DateTime zipMtime = File.GetLastWriteTime(src);
-				logger.Info("Loading {0}", src);
-				ZipReadFile z = new ZipReadFile(fsrc);
-
-				using (FileStream fdst = new FileStream(dst, FileMode.Create))
+				using (BufferedStream fsrc = new BufferedStream(ms))
 				{
+					DateTime zipMtime = File.GetLastWriteTime(src);
+					logger.Info("Loading {0}", src);
+					ZipReadFile z = new ZipReadFile(fsrc);
+
 					Replicate(z, fc, fdst, zipMtime);
 				}
+
+				var stat = ms.StatRead;
+				logger.Info("Stats read {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
+				stat = ms.StatWrite;
+				logger.Info("Stats write {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
+
+				stat = fdst.StatRead;
+				logger.Info("Stats read {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
+				stat = fdst.StatWrite;
+				logger.Info("Stats write {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
 			}
 		}
 
