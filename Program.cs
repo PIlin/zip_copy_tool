@@ -737,8 +737,9 @@ namespace PakPatcher
 					DateTime zipMtime = File.GetLastWriteTime(src);
 					logger.Info("Loading {0}", src);
 					ZipReadFile z = new ZipReadFile(fsrc);
-
+					logger.Info("Replicating {0}", src);
 					Replicate(z, fc, fdst, zipMtime);
+					logger.Info("Replication done {0}", src);
 				}
 			}
 
