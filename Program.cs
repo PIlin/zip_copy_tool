@@ -7,6 +7,48 @@ using System.Threading.Tasks;
 
 namespace PakPatcher
 {
+	class StreamUtil
+	{
+		public static void FillBuffer(Stream stream, byte[] buffer, int numBytes)
+		{
+			int read = 0;
+			do
+			{
+				int n = stream.Read(buffer, read, numBytes - read);
+				if (n == 0)
+				{
+					throw new EndOfStreamException();
+				}
+				read += n;
+			} while (read < numBytes);
+		}
+
+		public static byte[] ReadBuffer(Stream stream, byte[] buffer, int numBytes)
+		{
+			if (numBytes == 0) return buffer;
+			if (buffer?.Length < numBytes)
+			{
+				buffer = new byte[numBytes];
+			}
+			FillBuffer(stream, buffer, numBytes);
+			return buffer;
+		}
+
+		public static void CopyNTo(Stream src, Stream dst, long n)
+		{
+			long bufferSize = 4096;
+			byte[] buffer = new byte[bufferSize];
+			int read;
+			while (n > 0 &&
+				   (read = src.Read(buffer, 0, (int)Math.Min(bufferSize, n))) > 0)
+			{
+				dst.Write(buffer, 0, read);
+				n -= read;
+			}
+		}
+
+	}
+
 	class CDREnd
 	{
 		public const uint SIGNATURE = 0x06054b50;
@@ -487,43 +529,7 @@ namespace PakPatcher
 			return null;
 		}
 
-		static void FillBuffer(Stream stream, byte[] buffer, int numBytes)
-		{
-			int read = 0;
-			do
-			{
-				int n = stream.Read(buffer, read, numBytes - read);
-				if (n == 0)
-				{
-					throw new EndOfStreamException();
-				}
-				read += n;
-			} while (read < numBytes);
-		}
 
-		static byte[] ReadBuffer(Stream stream, byte[] buffer, int numBytes)
-		{
-			if (numBytes == 0) return buffer;
-			if (buffer?.Length < numBytes)
-			{
-				buffer = new byte[numBytes];
-			}
-			FillBuffer(stream, buffer, numBytes);
-			return buffer;
-		}
-
-		static void CopyNTo(Stream src, Stream dst, long n)
-		{
-			long bufferSize = 4096;
-			byte[] buffer = new byte[bufferSize];
-			int read;
-			while (n > 0 &&
-				   (read = src.Read(buffer, 0, (int)Math.Min(bufferSize, n))) > 0)
-			{
-				dst.Write(buffer, 0, read);
-				n -= read;
-			}
-		}
 
 		static void Replicate(ZipReadFile z1, ZipReadFile z2, Stream fsOut)
 		{
@@ -555,20 +561,20 @@ namespace PakPatcher
 				}
 
 				srcStream.Seek(srcRec.lLocalHeaderOffset, SeekOrigin.Begin);
-				FillBuffer(srcStream, localHeaderBuf, localHeaderBuf.Length);
+				StreamUtil.FillBuffer(srcStream, localHeaderBuf, localHeaderBuf.Length);
 
 				LocalFileHeader lfh = new LocalFileHeader(localHeaderBuf);
 				if (!lfh.Check(srcRec))
 					throw new FileFormatException($"LocalFileHeader failed check. File {srcRec.FileName}");
 
-				fileNameBuf = ReadBuffer(srcStream, fileNameBuf, lfh.nFileNameLength);
+				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.nFileNameLength);
 				if (!fileNameBuf.Take(lfh.nFileNameLength).SequenceEqual(srcRec.filenameBytes))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {srcRec.FileName}");
 
 				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
 				fsOut.Write(fileNameBuf, 0, lfh.nFileNameLength);
 				long size = lfh.nExtraFieldLength + lfh.desc.lSizeCompressed;
-				CopyNTo(srcStream, fsOut, size);
+				StreamUtil.CopyNTo(srcStream, fsOut, size);
 
 				expectedPos += LocalFileHeader.SIZE + lfh.nFileNameLength + size;
 			}
@@ -584,13 +590,9 @@ namespace PakPatcher
 		}
 
 
-		
 
-
-		static void Main(string[] args)
-        {
-			InitLog();
-
+		static void TestZipReplicate()
+		{
 			string inputFileV1 = "d:\\code\\PakPatcher\\test\\v1.zip";
 			string inputFileV2 = "d:\\code\\PakPatcher\\test\\v2.zip";
 			string outFileV2 = "d:\\code\\PakPatcher\\test\\v2_out.zip";
@@ -608,8 +610,22 @@ namespace PakPatcher
 					Replicate(z1, z2, fsOut);
 				}
 			}
+		}
 
+		static void TestCacheCopy()
+		{
+			var fc = new FileCache() { Root = @"f:\testcache" };
 
+			fc.Add(@"e:\photo\2020_Ma\IMG-8436bb0cf2bceb815b2065ee9ea4beb5-V.jpeg.jpg").CopyTo(@"f:\test_target\test.jpg");
+		}
+
+		static void Main(string[] args)
+        {
+			InitLog();
+
+			//TestZipReplicate();
+
+			TestCacheCopy();
         }
     }
 }
