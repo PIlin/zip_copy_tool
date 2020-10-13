@@ -49,11 +49,11 @@ namespace PakPatcher
     static class FileCacheUtil
     {
 
-        public static CacheId MakeFileId(MeasuringStream f, out FileStats stats)
+        public static CacheId MakeFileId(Stream f, string filepath, out FileStats stats)
         {
             stats = new FileStats()
             {
-                MTime = File.GetLastWriteTime(f.Name),
+                MTime = File.GetLastWriteTime(filepath),
                 Size = f.Length
             };
 
@@ -61,7 +61,7 @@ namespace PakPatcher
             {
                 h.AppendData(BitConverter.GetBytes(stats.Size));
 
-                f.Position = 0;
+                f.Seek(0, SeekOrigin.Begin);                    
 
                 long bufferSize = 4096;
                 byte[] buffer = new byte[bufferSize];
@@ -120,7 +120,7 @@ namespace PakPatcher
             }
         }
 
-        public void PlaceFS(MeasuringStream f, string filepath, FileStats stats)
+        public void PlaceStreamFile(Stream f, string filepath, FileStats stats)
         {
             PlaceStream(f, Path.GetFileName(filepath), stats);
         }
@@ -196,6 +196,7 @@ namespace PakPatcher
 
         public string Root { get; set; }
 
+
         public CacheObject Add(string filepath)
         {
             using (MeasuringStream s = new MeasuringStream(new FileStream(filepath, FileMode.Open), StreamPurpose.Source))
@@ -204,10 +205,10 @@ namespace PakPatcher
             }
         }
 
-        public CacheObject Add(MeasuringStream f, string filepath)
+        public CacheObject Add(Stream f, string filepath)
         {
             FileStats stats;
-            CacheId id = FileCacheUtil.MakeFileId(f, out stats);
+            CacheId id = FileCacheUtil.MakeFileId(f, filepath, out stats);
 
             CacheObject co = new CacheObject(id, Root);
             if (co.IsPathValid())
@@ -218,7 +219,7 @@ namespace PakPatcher
             else
             {
                 logger.Info("Placing {0}", id);
-                co.PlaceFS(f, filepath, stats);
+                co.PlaceStreamFile(f, filepath, stats);
             }
 
             return co;
@@ -229,12 +230,12 @@ namespace PakPatcher
             CacheObject co = new CacheObject(id, Root);
             if (co.IsPathValid())
             {
-                logger.Info("Already exists {0}", id);
+                //logger.Info("Already exists {0}", id);
                 co.UpdateMtime(stats);
             }
             else
             {
-                logger.Info("Placing {0}", id);
+                //logger.Info("Placing {0}", id);
                 co.PlaceStream(s, name, stats);
             }
 
