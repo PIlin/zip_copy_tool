@@ -493,6 +493,7 @@ namespace PakPatcher
 	{
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 		public const bool HackIgnoreLFHVersionNeeded = true;
+		public const bool HackIgnoreInconsistentFilenameSeparator = true;
 
 
 		static void InitLog()
@@ -533,7 +534,20 @@ namespace PakPatcher
 			return null;
 		}
 
-
+		static bool CompareFilenameBuffer(byte[] fileNameBuf, int fileNameLength, CDRFileHeader rec)
+		{
+			if (!fileNameBuf.Take(fileNameLength).SequenceEqual(rec.filenameBytes))
+            {
+                if (HackIgnoreInconsistentFilenameSeparator)
+                {
+                    string headerFileName = Encoding.UTF8.GetString(fileNameBuf, 0, fileNameLength);
+					// sometimes slashes are inconsistent between CDR and LFH.
+					return (rec.FileName.Replace('\\', '/') == headerFileName.Replace('\\', '/'));
+                }
+				return false;
+            }
+			return true;
+        }
 
 		static void Replicate(ZipReadFile z1, ZipReadFile z2, Stream fsOut)
 		{
@@ -572,7 +586,7 @@ namespace PakPatcher
 					throw new FileFormatException($"LocalFileHeader failed check. File {srcRec.FileName}");
 
 				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.nFileNameLength);
-				if (!fileNameBuf.Take(lfh.nFileNameLength).SequenceEqual(srcRec.filenameBytes))
+				if (!CompareFilenameBuffer(fileNameBuf, lfh.nFileNameLength, rec))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {srcRec.FileName}");
 
 				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
@@ -650,7 +664,7 @@ namespace PakPatcher
 					throw new FileFormatException($"LocalFileHeader failed check. File {rec.FileName}");
 
 				fileNameBuf = StreamUtil.ReadBuffer(z.Stream, fileNameBuf, lfh.nFileNameLength);
-				if (!fileNameBuf.Take(lfh.nFileNameLength).SequenceEqual(rec.filenameBytes))
+				if (!CompareFilenameBuffer(fileNameBuf, lfh.nFileNameLength, rec))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {rec.FileName}");
 
 				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
