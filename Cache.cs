@@ -125,7 +125,7 @@ namespace PakPatcher
             Directory.CreateDirectory(PathRoot);
             Meta meta = new Meta()
             {
-                name = f.Name,
+                name = Path.GetFileName(f.Name),
                 size = stats.Size,
                 mtime = stats.MTime
             };
