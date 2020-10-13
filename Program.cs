@@ -316,7 +316,7 @@ namespace PakPatcher
 
 		public bool Check(CDRFileHeader cfh)
 		{
-			return nVersionNeeded == cfh.nVersionNeeded
+			return (nVersionNeeded == cfh.nVersionNeeded || Program.HackIgnoreLFHVersionNeeded)
 				&& nFlags == cfh.nFlags
 				&& nMethod == cfh.nMethod
 				&& nLastModTime == cfh.nLastModTime
@@ -492,7 +492,7 @@ namespace PakPatcher
 	class Program
 	{
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-
+		public const bool HackIgnoreLFHVersionNeeded = true;
 
 
 		static void InitLog()
@@ -608,7 +608,12 @@ namespace PakPatcher
 					throw new NotImplementedException($"Support for nExtraFieldLength = {rec.nExtraFieldLength} > 0 is not implemented");
 				}
 
-				h.AppendData(BitConverter.GetBytes((Int16)rec.nVersionNeeded));
+				if (!HackIgnoreLFHVersionNeeded)
+				{
+#pragma warning disable CS0162 // Unreachable code detected
+                    h.AppendData(BitConverter.GetBytes((Int16)rec.nVersionNeeded));
+#pragma warning restore CS0162 // Unreachable code detected
+                }
 				h.AppendData(BitConverter.GetBytes((Int16)rec.nFlags));
 				// TODO: does modtime matter? Maybe not
 				//h.AppendData(BitConverter.GetBytes(rec.nLastModTime));
