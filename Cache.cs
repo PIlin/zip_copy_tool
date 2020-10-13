@@ -177,15 +177,23 @@ namespace PakPatcher
 
         private Meta LoadMeta()
         {
-            var utf8Reader = new Utf8JsonReader(File.ReadAllBytes(PathMeta));
-            var meta = JsonSerializer.Deserialize<Meta>(ref utf8Reader);
-            return meta;
+            using (Stream s = new MeasuringStream(new FileStream(PathMeta, FileMode.Open, FileAccess.Read), StreamPurpose.CacheMeta))
+            using (BinaryReader br = new BinaryReader(s))
+            {
+                var utf8Reader = new Utf8JsonReader(br.ReadBytes((int)s.Length));
+                var meta = JsonSerializer.Deserialize<Meta>(ref utf8Reader);
+                return meta;
+            }
+            
         }
 
         private void SaveMeta(Meta meta)
         {
-            byte[] jsonUtf8Bytes = JsonSerializer.SerializeToUtf8Bytes(meta);
-            File.WriteAllBytes(PathMeta, jsonUtf8Bytes);
+            using (Stream s = new MeasuringStream(new FileStream(PathMeta, FileMode.OpenOrCreate, FileAccess.Write), StreamPurpose.CacheMeta))
+            {
+                byte[] jsonUtf8Bytes = JsonSerializer.SerializeToUtf8Bytes(meta);
+                s.Write(jsonUtf8Bytes, 0, jsonUtf8Bytes.Length);
+            }
         }
     }
 

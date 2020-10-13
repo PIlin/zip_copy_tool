@@ -15,7 +15,8 @@ namespace PakPatcher
     { 
         Source,
         Target,
-        Cache
+        Cache,
+        CacheMeta
     }
 
     class MeasuringStream : Stream
@@ -368,7 +369,7 @@ namespace PakPatcher
         private static string GetBytesReadable(double i, string suffixExtra)
         {
             if (double.IsInfinity(i))
-                return "∞";
+                return i.ToString(CultureInfo.InvariantCulture);
 
             // Get absolute value
             double absolute_i = (i < 0 ? -i : i);
