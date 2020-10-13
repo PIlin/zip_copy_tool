@@ -39,6 +39,11 @@ namespace PakPatcher
         {
             Id = id;
         }
+
+        public override string ToString() 
+        {
+            return $"CacheId({Str})";
+        }
     }
 
     static class FileCacheUtil
