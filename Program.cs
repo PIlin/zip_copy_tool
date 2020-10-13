@@ -710,8 +710,8 @@ namespace PakPatcher
 
 		static void TestZipCacheReplicate(string src, string dst, FileCache fc)
 		{
-			using (MeasuringStream ms = new MeasuringStream(new FileStream(src, FileMode.Open)))
-			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.Create)))
+			using (MeasuringStream ms = new MeasuringStream(new FileStream(src, FileMode.Open), StreamPurpose.Source))
+			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.Create), StreamPurpose.Target))
 			{
 				using (BufferedStream fsrc = new BufferedStream(ms))
 				{
@@ -721,17 +721,10 @@ namespace PakPatcher
 
 					Replicate(z, fc, fdst, zipMtime);
 				}
-
-				var stat = ms.StatRead;
-				logger.Info("Stats read {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
-				stat = ms.StatWrite;
-				logger.Info("Stats write {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
-
-				stat = fdst.StatRead;
-				logger.Info("Stats read {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
-				stat = fdst.StatWrite;
-				logger.Info("Stats write {}, {}, {}, {}", stat.count, stat.time, stat.TS, stat.Speed);
 			}
+
+			StreamStatsMgr.Instance.LogReports();
+			StreamStatsMgr.Instance.Reset();
 		}
 
 		static void TestZipCacheReplicate()
