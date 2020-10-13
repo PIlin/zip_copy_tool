@@ -39,7 +39,7 @@ namespace PakPatcher
 		{
 			if (n > 0)
 			{
-				long bufferSize = 4096;
+				const long bufferSize = 64 * 1024;
 				byte[] buffer = new byte[bufferSize];
 				int read;
 				while (n > 0 &&
@@ -538,14 +538,16 @@ namespace PakPatcher
 		{
 			if (!fileNameBuf.Take(fileNameLength).SequenceEqual(rec.filenameBytes))
             {
-                if (HackIgnoreInconsistentFilenameSeparator)
+#pragma warning disable CS0162 // Unreachable code detected
+				if (HackIgnoreInconsistentFilenameSeparator)
                 {
                     string headerFileName = Encoding.UTF8.GetString(fileNameBuf, 0, fileNameLength);
 					// sometimes slashes are inconsistent between CDR and LFH.
 					return (rec.FileName.Replace('\\', '/') == headerFileName.Replace('\\', '/'));
                 }
 				return false;
-            }
+#pragma warning restore CS0162 // Unreachable code detected
+			}
 			return true;
         }
 
