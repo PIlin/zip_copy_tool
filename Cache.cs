@@ -49,7 +49,7 @@ namespace PakPatcher
     static class FileCacheUtil
     {
 
-        public static CacheId MakeFileId(FileStream f, out FileStats stats)
+        public static CacheId MakeFileId(MeasuringStream f, out FileStats stats)
         {
             stats = new FileStats()
             {
@@ -120,9 +120,9 @@ namespace PakPatcher
             }
         }
 
-        public void PlaceFS(FileStream f, FileStats stats)
+        public void PlaceFS(MeasuringStream f, string filepath, FileStats stats)
         {
-            PlaceStream(f, Path.GetFileName(f.Name), stats);
+            PlaceStream(f, Path.GetFileName(filepath), stats);
         }
 
         public void PlaceStream(Stream f, string name, FileStats stats)
@@ -136,7 +136,7 @@ namespace PakPatcher
             };
             SaveMeta(meta);
 
-            using (FileStream dst = new FileStream(PathObj, FileMode.OpenOrCreate, FileAccess.Write))
+            using (MeasuringStream dst = new MeasuringStream(new FileStream(PathObj, FileMode.OpenOrCreate, FileAccess.Write), StreamPurpose.Cache))
             {
                 StreamUtil.CopyNTo(f, dst, stats.Size);
             }
@@ -146,7 +146,7 @@ namespace PakPatcher
         public void CopyToFile(string dst)
         {
             Meta meta = LoadMeta();
-            using (FileStream fdst = new FileStream(dst, FileMode.OpenOrCreate, FileAccess.Write))
+            using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.OpenOrCreate, FileAccess.Write), StreamPurpose.Target))
             {
                 CopyTo(fdst, meta.size);
             }
@@ -165,7 +165,7 @@ namespace PakPatcher
 
         private void CopyTo(Stream dst, long size)
         {
-            using (FileStream src = new FileStream(PathObj, FileMode.Open, FileAccess.Read))
+            using (MeasuringStream src = new MeasuringStream(new FileStream(PathObj, FileMode.Open, FileAccess.Read), StreamPurpose.Cache))
             { 
                 if (src.Length != size)
                 {
@@ -198,13 +198,13 @@ namespace PakPatcher
 
         public CacheObject Add(string filepath)
         {
-            using (FileStream s = new FileStream(filepath, FileMode.Open))
+            using (MeasuringStream s = new MeasuringStream(new FileStream(filepath, FileMode.Open), StreamPurpose.Source))
             {
-                return Add(s);
+                return Add(s, filepath);
             }
         }
 
-        public CacheObject Add(FileStream f)
+        public CacheObject Add(MeasuringStream f, string filepath)
         {
             FileStats stats;
             CacheId id = FileCacheUtil.MakeFileId(f, out stats);
@@ -218,7 +218,7 @@ namespace PakPatcher
             else
             {
                 logger.Info("Placing {0}", id);
-                co.PlaceFS(f, stats);
+                co.PlaceFS(f, filepath, stats);
             }
 
             return co;
