@@ -122,44 +122,56 @@ namespace PakPatcher
 
         public void PlaceFS(FileStream f, FileStats stats)
         {
+            PlaceStream(f, Path.GetFileName(f.Name), stats);
+        }
+
+        public void PlaceStream(Stream f, string name, FileStats stats)
+        {
             Directory.CreateDirectory(PathRoot);
             Meta meta = new Meta()
             {
-                name = Path.GetFileName(f.Name),
+                name = name,
                 size = stats.Size,
                 mtime = stats.MTime
             };
             SaveMeta(meta);
 
-
-
             using (FileStream dst = new FileStream(PathObj, FileMode.OpenOrCreate, FileAccess.Write))
             {
-                f.Position = 0;
                 StreamUtil.CopyNTo(f, dst, stats.Size);
             }
             File.SetLastWriteTime(PathObj, stats.MTime);
         }
 
-        public void CopyTo(string dst)
+        public void CopyToFile(string dst)
         {
             Meta meta = LoadMeta();
             using (FileStream fdst = new FileStream(dst, FileMode.OpenOrCreate, FileAccess.Write))
             {
-                CopyTo(fdst, meta);
+                CopyTo(fdst, meta.size);
             }
             File.SetLastWriteTime(dst, meta.mtime);
         }
 
-        private void CopyTo(FileStream dst, Meta meta)
+        public void CopyToStream(Stream dst, long maxSize)
+        {
+            Meta meta = LoadMeta();
+            if (meta.size != maxSize)
+            {
+                throw new InvalidDataException();
+            }
+            CopyTo(dst, maxSize);
+        }
+
+        private void CopyTo(Stream dst, long size)
         {
             using (FileStream src = new FileStream(PathObj, FileMode.Open, FileAccess.Read))
             { 
-                if (src.Length != meta.size)
+                if (src.Length != size)
                 {
                     throw new InvalidDataException();
                 }
-                StreamUtil.CopyNTo(src, dst, meta.size);
+                StreamUtil.CopyNTo(src, dst, size);
             }
         }
 
@@ -207,6 +219,23 @@ namespace PakPatcher
             {
                 logger.Info("Placing {0}", id);
                 co.PlaceFS(f, stats);
+            }
+
+            return co;
+        }
+
+        public CacheObject AddFromStream(CacheId id, string name, FileStats stats, Stream s)
+        {
+            CacheObject co = new CacheObject(id, Root);
+            if (co.IsPathValid())
+            {
+                logger.Info("Already exists {0}", id);
+                co.UpdateMtime(stats);
+            }
+            else
+            {
+                logger.Info("Placing {0}", id);
+                co.PlaceStream(s, name, stats);
             }
 
             return co;

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -485,8 +486,8 @@ namespace PakPatcher
 	}
 
 
-    class Program
-    {
+	class Program
+	{
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
 
@@ -591,6 +592,91 @@ namespace PakPatcher
 
 
 
+		static CacheId ComputeZipLocalFileCacheId(LocalFileHeader rec)
+		{
+			using (var h = IncrementalHash.CreateHash(HashAlgorithmName.SHA1))
+			{
+				if (!BitConverter.IsLittleEndian)
+                {
+					throw new NotImplementedException("BigEndian support is not implmeneted");
+                }
+				if (rec.nExtraFieldLength != 0)
+				{
+					throw new NotImplementedException($"Support for nExtraFieldLength = {rec.nExtraFieldLength} > 0 is not implemented");
+				}
+
+				h.AppendData(BitConverter.GetBytes((Int16)rec.nVersionNeeded));
+				h.AppendData(BitConverter.GetBytes((Int16)rec.nFlags));
+				// TODO: does modtime matter? Maybe not
+				//h.AppendData(BitConverter.GetBytes(rec.nLastModTime));
+				//h.AppendData(BitConverter.GetBytes(rec.nLastModDate));
+
+				h.AppendData(BitConverter.GetBytes(rec.desc.lCRC32));
+				h.AppendData(BitConverter.GetBytes(rec.desc.lSizeCompressed));
+				h.AppendData(BitConverter.GetBytes(rec.desc.lSizeUncompressed));
+
+				return new CacheId(h.GetHashAndReset());
+			}
+		}
+
+
+		static void Replicate(ZipReadFile z, FileCache fc, Stream fsOut, DateTime zipMtime)
+		{
+			var zEntries = z.CDR.Entries;
+			zEntries.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+
+			byte[] localHeaderBuf = new byte[LocalFileHeader.SIZE];
+			byte[] fileNameBuf = new byte[256];
+
+			long expectedPos = 0;
+			foreach (var rec in zEntries)
+			{
+				if (rec.lLocalHeaderOffset != expectedPos)
+					throw new FileFormatException($"Unable to replicate zip - data stream has holes. File {rec.FileName}, expected offset {expectedPos:x}, actual offset {rec.lLocalHeaderOffset:x}");
+
+				z.Stream.Seek(rec.lLocalHeaderOffset, SeekOrigin.Begin);
+				StreamUtil.FillBuffer(z.Stream, localHeaderBuf, localHeaderBuf.Length);
+
+				LocalFileHeader lfh = new LocalFileHeader(localHeaderBuf);
+				if (!lfh.Check(rec))
+					throw new FileFormatException($"LocalFileHeader failed check. File {rec.FileName}");
+
+				fileNameBuf = StreamUtil.ReadBuffer(z.Stream, fileNameBuf, lfh.nFileNameLength);
+				if (!fileNameBuf.Take(lfh.nFileNameLength).SequenceEqual(rec.filenameBytes))
+					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {rec.FileName}");
+
+				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
+				fsOut.Write(fileNameBuf, 0, lfh.nFileNameLength);
+				StreamUtil.CopyNTo(z.Stream, fsOut, lfh.nExtraFieldLength);
+
+				long dataPos = z.Stream.Position;
+				long curExpectedPos = expectedPos + LocalFileHeader.SIZE + lfh.nFileNameLength + lfh.nExtraFieldLength;
+				if (curExpectedPos != dataPos)
+					throw new FileFormatException($"Unable to replicate zip - data stream has holes. data expected offset {curExpectedPos:x}, actual offset {dataPos:x}");
+
+				long size = lfh.desc.lSizeCompressed;
+
+				FileStats fs = new FileStats() { Size = size, MTime = zipMtime };
+				CacheId id = ComputeZipLocalFileCacheId(lfh);
+				CacheObject co = fc.AddFromStream(id, Path.GetFileName(rec.FileName), fs, z.Stream);
+				co.CopyToStream(fsOut, size);
+
+				expectedPos += LocalFileHeader.SIZE + lfh.nFileNameLength + lfh.nExtraFieldLength + size;
+			}
+
+			if (z.CDROffset != expectedPos)
+				throw new FileFormatException($"Unable to replicate zip - data stream has holes. CDR expected offset {expectedPos:x}, actual offset {z.CDROffset:x}");
+
+			{
+				// Copy CDR + CDREnd + comment
+				Stream srcStream = z.Stream;
+				srcStream.Seek(z.CDROffset, SeekOrigin.Begin);
+				srcStream.CopyTo(fsOut);
+			}
+		}
+
+
+
 		static void TestZipReplicate()
 		{
 			string inputFileV1 = "d:\\code\\PakPatcher\\test\\v1.zip";
@@ -616,8 +702,31 @@ namespace PakPatcher
 		{
 			var fc = new FileCache() { Root = @"f:\testcache" };
 
-			fc.Add(@"e:\photo\2020_Ma\IMG-8436bb0cf2bceb815b2065ee9ea4beb5-V.jpeg.jpg").CopyTo(@"f:\test_target\test.jpg");
+			fc.Add(@"e:\photo\2020_Ma\IMG-8436bb0cf2bceb815b2065ee9ea4beb5-V.jpeg.jpg").CopyToFile(@"f:\test_target\test.jpg");
 		}
+
+		static void TestZipCacheReplicate(string src, string dst, FileCache fc)
+		{
+			using (BufferedStream fsrc = new BufferedStream(new FileStream(src, FileMode.Open)))
+			{
+				DateTime zipMtime = File.GetLastWriteTime(src);
+				logger.Info("Loading {0}", src);
+				ZipReadFile z = new ZipReadFile(fsrc);
+
+				using (FileStream fdst = new FileStream(dst, FileMode.Create))
+				{
+					Replicate(z, fc, fdst, zipMtime);
+				}
+			}
+		}
+
+		static void TestZipCacheReplicate()
+		{
+			var fc = new FileCache() { Root = @"f:\testcache" };
+			TestZipCacheReplicate(@"d:\code\PakPatcher\test\v1.zip", @"d:\code\PakPatcher\test\v1_out.zip", fc);
+			TestZipCacheReplicate(@"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v2_out.zip", fc);
+		}
+
 
 		static void Main(string[] args)
         {
@@ -625,7 +734,8 @@ namespace PakPatcher
 
 			//TestZipReplicate();
 
-			TestCacheCopy();
-        }
+			//TestCacheCopy();
+			TestZipCacheReplicate();
+		}
     }
 }
