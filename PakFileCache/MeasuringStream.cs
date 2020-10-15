@@ -26,6 +26,7 @@ namespace PakFileCache
         {
             public Int64 count;
             public Int64 time;
+            public Int64 opCount;
 
             public TimeSpan TS => new TimeSpan(time);
             public double Speed => TS.TotalSeconds != 0 ? (count / TS.TotalSeconds) : double.PositiveInfinity;
@@ -34,7 +35,8 @@ namespace PakFileCache
             public static BwStat operator +(BwStat a, BwStat b) => new BwStat() 
             { 
                 count = a.count + b.count, 
-                time = a.time + b.time
+                time = a.time + b.time,
+                opCount = a.opCount + b.opCount,
             };
         }
 
@@ -198,6 +200,7 @@ namespace PakFileCache
             t.Stop();
             m_readStat.count += count;
             m_readStat.time += t.ElapsedTicks;
+            m_readStat.opCount += 1;
         }
 
         private void StopAddWrite(Int64 count, Stopwatch t)
@@ -205,6 +208,7 @@ namespace PakFileCache
             t.Stop();
             m_writeStat.count += count;
             m_writeStat.time += t.ElapsedTicks;
+            m_writeStat.opCount += 1;
         }
     }
 
@@ -248,10 +252,13 @@ namespace PakFileCache
             public MeasuringStream.BwStat Read { get; set; } = new MeasuringStream.BwStat();
             public MeasuringStream.BwStat Write { get; set; } = new MeasuringStream.BwStat();
 
+            public int StreamCount { get; set; } = 0;
+
             public void AddToReport(MeasuringStream stream)
             {
                 Read += stream.StatRead;
                 Write += stream.StatWrite;
+                StreamCount += 1;
             }
         }
 
@@ -292,13 +299,13 @@ namespace PakFileCache
                     StringBuilder info = new StringBuilder();
                     info.AppendLine("Report by disk");
 
-                    Action<MeasuringStream.BwStat> appendStat = (MeasuringStream.BwStat s) => { info.Append($"{GetBytesReadable(s.count)}, {s.TS}, {GetBytesReadable(s.Speed, "/s")}; "); };
+                    Action<MeasuringStream.BwStat> appendStat = (MeasuringStream.BwStat s) => { info.Append($"{GetBytesReadable(s.count)}, {s.TS}, {GetBytesReadable(s.Speed, "/s")}, {s.opCount} ops; "); };
 
                     foreach (var p in ReportsByDisk)
                     {
                         var r = p.Value.Read;
                         var w = p.Value.Write;
-                        info.Append($"{p.Key.Name} ({p.Key.DriveType}): ");
+                        info.Append($"{p.Key.Name} ({p.Key.DriveType}): {p.Value.StreamCount} streams: ");
                         info.Append("r => ");
                         appendStat(r);
                         info.Append("w => ");
@@ -310,7 +317,7 @@ namespace PakFileCache
                     {
                         var r = p.Value.Read;
                         var w = p.Value.Write;
-                        info.Append($"{p.Key}: ");
+                        info.Append($"{p.Key}: {p.Value.StreamCount} streams: ");
                         info.Append("r => ");
                         appendStat(r);
                         info.Append("w => ");
