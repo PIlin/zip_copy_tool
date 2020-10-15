@@ -46,15 +46,17 @@ namespace PakFileCache
 
     static class FileCacheUtil
     {
-
-        public static CacheId MakeFileId(Stream f, string filepath, out FileStats stats)
-        {
-            stats = new FileStats()
+        public static FileStats GetFileStats(Stream f, string filepath)
+        { 
+            return new FileStats()
             {
                 MTime = File.GetLastWriteTime(filepath),
                 Size = f.Length
             };
+        }
 
+        public static CacheId MakeFileId(Stream f, string filepath, FileStats stats)
+        {
             using (var h = IncrementalHash.CreateHash(HashAlgorithmName.SHA1))
             {
                 h.AppendData(BitConverter.GetBytes(stats.Size));
@@ -201,7 +203,13 @@ namespace PakFileCache
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
         public string Root { get; set; }
+        public Int64 SmallFileSize { get; set; } = 2 * 1024;
 
+        public FileCache(string root)
+        {
+            Root = root;
+            Directory.CreateDirectory(Root);
+        }
 
         public CacheObject Add(string filepath)
         {
@@ -213,8 +221,13 @@ namespace PakFileCache
 
         public CacheObject Add(Stream f, string filepath)
         {
-            FileStats stats;
-            CacheId id = FileCacheUtil.MakeFileId(f, filepath, out stats);
+            FileStats stats = FileCacheUtil.GetFileStats(f, filepath);
+            return Add(f, filepath, stats);
+        }
+
+        CacheObject Add(Stream f, string filepath, FileStats stats)
+        {
+            CacheId id = FileCacheUtil.MakeFileId(f, filepath, stats);
 
             CacheObject co = new CacheObject(id, Root);
             if (co.IsPathValid())
@@ -246,6 +259,28 @@ namespace PakFileCache
             }
 
             return co;
+        }
+
+        public void CopyFile(string srcFilepath, string dstFilepath)
+        {
+            using (MeasuringStream src = new MeasuringStream(new FileStream(srcFilepath, FileMode.Open), StreamPurpose.Source))
+            {
+                FileStats stats = FileCacheUtil.GetFileStats(src, srcFilepath);
+
+                if (stats.Size >= SmallFileSize)
+                {
+                    CacheObject co = Add(src, srcFilepath, stats);
+                    co.CopyToFile(dstFilepath);
+                }
+                else
+                {
+                    using (MeasuringStream dst = new MeasuringStream(new FileStream(dstFilepath, FileMode.OpenOrCreate, FileAccess.Write), StreamPurpose.Target))
+                    {
+                        StreamUtil.CopyNTo(src, dst, stats.Size);
+                    }
+                    File.SetLastWriteTime(dstFilepath, stats.MTime);
+                }
+            }
         }
 
     }
