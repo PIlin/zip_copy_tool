@@ -78,8 +78,7 @@ namespace PakFileCache
 
 				long size = lfh.desc.lSizeCompressed;
 
-				const long smallSizeLimit = 2 * 1024;
-				if (size >= smallSizeLimit)
+				if (size >= fc.SmallFileSize)
 				{
 					FileStats fs = new FileStats() { Size = size, MTime = zipMtime };
 					CacheId id = ComputeZipLocalFileCacheId(lfh);
