@@ -17,12 +17,13 @@ namespace PakFileCache
 		{
 			logger.Info("Processing {0}", src);
 			Stopwatch startTime = Stopwatch.StartNew();
+			DateTime zipMtime;
 			using (MeasuringStream ms = new MeasuringStream(new FileStream(src, FileMode.Open), StreamPurpose.Source))
 			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.Create), StreamPurpose.Target))
 			{
 				using (BufferedStream fsrc = new BufferedStream(ms))
 				{
-					DateTime zipMtime = File.GetLastWriteTime(src);
+					zipMtime = File.GetLastWriteTime(src);
 					ZipReadFile z = new ZipReadFile(fsrc);
 					logger.Info("Replicating {0}", src);
 					Stopwatch startRepTime = Stopwatch.StartNew();
@@ -31,6 +32,7 @@ namespace PakFileCache
 					logger.Info("Replication {0} done in {1}", src, startRepTime.Elapsed);
 				}
 			}
+			File.SetLastWriteTime(dst, zipMtime);
 
 			startTime.Stop();
 			logger.Info("Processing {0} done in {1}", src, startTime.Elapsed);
