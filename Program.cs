@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -731,19 +732,25 @@ namespace PakPatcher
 
 		static void TestZipCacheReplicate(string src, string dst, FileCache fc)
 		{
+			logger.Info("Processing {0}", src);
+			Stopwatch startTime = Stopwatch.StartNew();
 			using (MeasuringStream ms = new MeasuringStream(new FileStream(src, FileMode.Open), StreamPurpose.Source))
 			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.Create), StreamPurpose.Target))
 			{
 				using (BufferedStream fsrc = new BufferedStream(ms))
 				{
 					DateTime zipMtime = File.GetLastWriteTime(src);
-					logger.Info("Loading {0}", src);
 					ZipReadFile z = new ZipReadFile(fsrc);
 					logger.Info("Replicating {0}", src);
+					Stopwatch startRepTime = Stopwatch.StartNew();
 					Replicate(z, fc, fdst, zipMtime);
-					logger.Info("Replication done {0}", src);
+					startRepTime.Stop();
+					logger.Info("Replication {0} done in {1}", src, startRepTime.Elapsed);
 				}
 			}
+
+			startTime.Stop();
+			logger.Info("Processing {0} done in {1}", src, startTime.Elapsed);
 
 			StreamStatsMgr.Instance.LogReports();
 			StreamStatsMgr.Instance.Reset();
