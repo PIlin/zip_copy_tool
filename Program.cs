@@ -681,10 +681,18 @@ namespace PakPatcher
 
 				long size = lfh.desc.lSizeCompressed;
 
-				FileStats fs = new FileStats() { Size = size, MTime = zipMtime };
-				CacheId id = ComputeZipLocalFileCacheId(lfh);
-				CacheObject co = fc.AddFromStream(id, Path.GetFileName(rec.FileName), fs, z.Stream);
-				co.CopyToStream(fsOut, size);
+				const long smallSizeLimit = 2 * 1024;
+				if (size >= smallSizeLimit)
+				{
+					FileStats fs = new FileStats() { Size = size, MTime = zipMtime };
+					CacheId id = ComputeZipLocalFileCacheId(lfh);
+					CacheObject co = fc.AddFromStream(id, Path.GetFileName(rec.FileName), fs, z.Stream);
+					co.CopyToStream(fsOut, size);
+				}
+                else
+                {
+					StreamUtil.CopyNTo(z.Stream, fsOut, size);
+                }
 
 				expectedPos += LocalFileHeader.SIZE + lfh.nFileNameLength + lfh.nExtraFieldLength + size;
 			}
