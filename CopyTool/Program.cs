@@ -109,6 +109,9 @@ namespace CopyTool
 				CopyFile(srcPath, dstPath);
 			else if (srcPathType == EPathType.Dir)
 				CopyDir(srcPath, dstPath);
+
+			PakFileCache.StreamStatsMgr.Instance.LogReports();
+			PakFileCache.StreamStatsMgr.Instance.Reset();
 		}
 
 		void CopyFile(string srcPath, string dstPath)
@@ -116,10 +119,12 @@ namespace CopyTool
 			string srcExt = Path.GetExtension(srcPath);
 			if (srcExt == ".zip" || srcExt == ".pak")
 			{
+				logger.Info("Copy zip {0} to {1}", srcPath, dstPath);
 				PakFileCache.ZipReplicate.ReplicateZipFileWithCache(srcPath, dstPath, m_fileCache);
 			}
 			else
 			{
+				logger.Info("Copy {0} to {1}", srcPath, dstPath);
 				m_fileCache.CopyFile(srcPath, dstPath);
 			}
 		}

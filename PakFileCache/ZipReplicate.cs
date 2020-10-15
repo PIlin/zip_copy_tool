@@ -34,9 +34,6 @@ namespace PakFileCache
 
 			startTime.Stop();
 			logger.Info("Processing {0} done in {1}", src, startTime.Elapsed);
-
-			StreamStatsMgr.Instance.LogReports();
-			StreamStatsMgr.Instance.Reset();
 		}
 
 		/// <summary>

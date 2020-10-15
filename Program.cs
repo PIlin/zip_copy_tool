@@ -21,12 +21,19 @@
 			fc.Add(@"e:\photo\2020_Ma\IMG-8436bb0cf2bceb815b2065ee9ea4beb5-V.jpeg.jpg").CopyToFile(@"f:\test_target\test.jpg");
 		}
 
+		static void ReplicateZipFileWithCache(string src, string dst, PakFileCache.FileCache fc)
+		{
+			PakFileCache.ZipReplicate.ReplicateZipFileWithCache(src, dst, fc);
+			PakFileCache.StreamStatsMgr.Instance.LogReports();
+			PakFileCache.StreamStatsMgr.Instance.Reset();
+		}
+
 		static void TestZipCacheReplicate()
 		{
-			var fc = new PakFileCache.FileCache(@"f:\testcache");
+			var fc = new PakFileCache.FileCache(@"f:\testcache") { SmallFileSize = 0 };
 
-			PakFileCache.ZipReplicate.ReplicateZipFileWithCache(@"d:\code\PakPatcher\test\v1.zip", @"d:\code\PakPatcher\test\v1_out.zip", fc);
-			PakFileCache.ZipReplicate.ReplicateZipFileWithCache(@"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v2_out.zip", fc);
+			ReplicateZipFileWithCache(@"d:\code\PakPatcher\test\v1.zip", @"d:\code\PakPatcher\test\v1_out.zip", fc);
+			ReplicateZipFileWithCache(@"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v2_out.zip", fc);
 		}
 
 

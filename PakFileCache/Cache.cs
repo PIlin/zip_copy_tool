@@ -234,12 +234,12 @@ namespace PakFileCache
             CacheObject co = new CacheObject(id, Root);
             if (co.IsPathValid())
             {
-                logger.Info("Already exists {0}", id);
+                //logger.Info("Already exists {0}", id);
                 co.UpdateMtime(stats);
             }
             else
             {
-                logger.Info("Placing {0}", id);
+                //logger.Info("Placing {0}", id);
                 co.PlaceStreamFile(f, filepath, stats);
             }
 
