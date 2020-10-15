@@ -11,6 +11,8 @@ namespace CopyTool
     {
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
+		private static char[] s_dirSeparators = new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
+
 		PakFileCache.FileCache m_fileCache;
 
 		static void InitLog()
@@ -36,6 +38,13 @@ namespace CopyTool
 			if (Directory.Exists(path)) return EPathType.Dir;
 			if (File.Exists(path)) return EPathType.File;
 			return EPathType.None;
+		}
+
+		static string NormalizePath(string path)
+		{
+			path = Path.GetFullPath(path);
+			path = path.TrimEnd(s_dirSeparators);
+			return path;
 		}
 
 		static void Main(string[] args)
@@ -65,7 +74,7 @@ namespace CopyTool
 				{
 					if (args[i + 1][0] != '-')
 					{
-						fileCachePath = args[i + 1];
+						fileCachePath = NormalizePath(args[i + 1]);
 						i += 2;
 					}
 					else
@@ -78,8 +87,8 @@ namespace CopyTool
 				throw new ArgumentException("srcPath and dstPath is missing");
 			}
 
-			string srcPath = args[i++];
-			string dstPath = args[i++];
+			string srcPath = NormalizePath(args[i++]);
+			string dstPath = NormalizePath(args[i++]);
 
 			InitFileCache(fileCachePath);
 
@@ -131,7 +140,23 @@ namespace CopyTool
 
 		void CopyDir(string srcPath, string dstPath)
 		{
-			throw new NotImplementedException();
+			foreach (string srcFilepath in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
+			{
+				string srcDir = Path.GetDirectoryName(srcFilepath);
+				if (srcDir.StartsWith(srcPath))
+				{
+					string srcRelDir = srcDir.Remove(0, srcPath.Length).Trim(s_dirSeparators);
+					string dstDir = Path.Combine(dstPath, srcRelDir);
+					string dstFilepath = Path.Combine(dstDir, Path.GetFileName(srcFilepath));
+					Directory.CreateDirectory(dstDir);
+					CopyFile(srcFilepath, dstFilepath);
+				}
+				else
+                {
+					throw new Exception($"Unable to retrieve path of file {srcFilepath} relative to {srcPath}");
+                }
+			}
 		}
+
 	}
 }
