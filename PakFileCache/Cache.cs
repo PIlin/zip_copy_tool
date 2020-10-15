@@ -73,6 +73,8 @@ namespace PakFileCache
                     h.AppendData(buffer);
                     n -= read;
                 }
+                
+                f.Seek(0, SeekOrigin.Begin);
 
                 return new CacheId(h.GetHashAndReset());
             }
