@@ -105,6 +105,7 @@ namespace CopyTool
 			m_fileCache = new PakFileCache.FileCache(fileCachePath);
 
 			m_fileCache.SmallFileSize = 50;
+			m_fileCache.DefaultCacheIdGenerator = new PakFileCache.CacheIdGeneratorSimple();
 			m_fileCache.ExcludeNamePatterns.Add(new Regex(@"Cry.+\.(pdb|exe|dll)"));
 		}
 

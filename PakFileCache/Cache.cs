@@ -56,14 +56,22 @@ namespace PakFileCache
                 Size = f.Length
             };
         }
+    }
 
-        public static CacheId MakeFileId(Stream f, string filepath, FileStats stats)
+    public interface ICacheIdGenerator
+    {
+        CacheId Process(Stream f, string filepath, FileStats stats);
+    }
+
+    public class CacheIdGeneratorContent : ICacheIdGenerator
+    {
+        public CacheId Process(Stream f, string filepath, FileStats stats)
         {
             using (var h = IncrementalHash.CreateHash(HashAlgorithmName.SHA1))
             {
                 h.AppendData(BitConverter.GetBytes(stats.Size));
 
-                f.Seek(0, SeekOrigin.Begin);                    
+                f.Seek(0, SeekOrigin.Begin);
 
                 long bufferSize = 4096;
                 byte[] buffer = new byte[bufferSize];
@@ -75,7 +83,7 @@ namespace PakFileCache
                     h.AppendData(buffer);
                     n -= read;
                 }
-                
+
                 f.Seek(0, SeekOrigin.Begin);
 
                 return new CacheId(h.GetHashAndReset());
@@ -83,6 +91,20 @@ namespace PakFileCache
         }
     }
 
+    public class CacheIdGeneratorSimple : ICacheIdGenerator
+    {
+        public CacheId Process(Stream f, string filepath, FileStats stats)
+        {
+            using (var h = IncrementalHash.CreateHash(HashAlgorithmName.SHA1))
+            {
+                string name = Path.GetFileName(filepath);
+                h.AppendData(UTF8Encoding.UTF8.GetBytes(name));
+                h.AppendData(BitConverter.GetBytes(stats.Size));
+                h.AppendData(BitConverter.GetBytes(stats.MTime.ToBinary()));
+                return new CacheId(h.GetHashAndReset());
+            }
+        }
+    }
 
     public class CacheObject
     {
@@ -210,29 +232,36 @@ namespace PakFileCache
         public Int64 SmallFileSize { get; set; } = 2 * 1024;
         public List<Regex> ExcludeNamePatterns { get; set; } = new List<Regex>();
 
+        public ICacheIdGenerator DefaultCacheIdGenerator { get; set; } = new CacheIdGeneratorContent();
+
         public FileCache(string root)
         {
             Root = root;
             Directory.CreateDirectory(Root);
         }
 
-        public CacheObject Add(string filepath)
+        public CacheObject Add(string filepath, ICacheIdGenerator idGen)
         {
             using (MeasuringStream s = new MeasuringStream(new FileStream(filepath, FileMode.Open), StreamPurpose.Source))
             {
-                return Add(s, filepath);
+                return Add(s, filepath, idGen);
             }
         }
 
-        public CacheObject Add(Stream f, string filepath)
+        public CacheObject Add(Stream f, string filepath, ICacheIdGenerator idGen)
         {
             FileStats stats = FileCacheUtil.GetFileStats(f, filepath);
-            return Add(f, filepath, stats);
+            return Add(f, filepath, stats, idGen);
         }
 
-        CacheObject Add(Stream f, string filepath, FileStats stats)
+        CacheObject Add(Stream f, string filepath, FileStats stats, ICacheIdGenerator idGen)
         {
-            CacheId id = FileCacheUtil.MakeFileId(f, filepath, stats);
+            if (idGen == null)
+            {
+                idGen = DefaultCacheIdGenerator;
+            }
+
+            CacheId id = idGen.Process(f, filepath, stats);
 
             CacheObject co = new CacheObject(id, Root);
             if (co.IsPathValid())
@@ -287,7 +316,7 @@ namespace PakFileCache
 
                 if (IsFileAllowedForCache(srcFilepath, stats))
                 {
-                    CacheObject co = Add(src, srcFilepath, stats);
+                    CacheObject co = Add(src, srcFilepath, stats, DefaultCacheIdGenerator);
                     co.CopyToFile(dstFilepath);
                 }
                 else
