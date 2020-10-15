@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace PakFileCache
 {
@@ -206,6 +208,7 @@ namespace PakFileCache
 
         public string Root { get; set; }
         public Int64 SmallFileSize { get; set; } = 2 * 1024;
+        public List<Regex> ExcludeNamePatterns { get; set; } = new List<Regex>();
 
         public FileCache(string root)
         {
@@ -263,13 +266,26 @@ namespace PakFileCache
             return co;
         }
 
+        private bool IsFileAllowedForCache(string srcFilepath, FileStats stats)
+        {
+            if (stats.Size < SmallFileSize)
+                return false;
+            string name = Path.GetFileName(srcFilepath);
+            foreach (var re in ExcludeNamePatterns)
+            {
+                if (re.IsMatch(name))
+                    return false;
+            }
+            return true;
+        }
+
         public void CopyFile(string srcFilepath, string dstFilepath)
         {
             using (MeasuringStream src = new MeasuringStream(new FileStream(srcFilepath, FileMode.Open), StreamPurpose.Source))
             {
                 FileStats stats = FileCacheUtil.GetFileStats(src, srcFilepath);
 
-                if (stats.Size >= SmallFileSize)
+                if (IsFileAllowedForCache(srcFilepath, stats))
                 {
                     CacheObject co = Add(src, srcFilepath, stats);
                     co.CopyToFile(dstFilepath);

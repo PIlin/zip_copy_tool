@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.IO;
 
@@ -102,6 +103,9 @@ namespace CopyTool
 				throw new ArgumentException($"Invalid file cache path {fileCachePath}", "cache");
 
 			m_fileCache = new PakFileCache.FileCache(fileCachePath);
+
+			m_fileCache.SmallFileSize = 50;
+			m_fileCache.ExcludeNamePatterns.Add(new Regex(@"Cry.+\.(pdb|exe|dll)"));
 		}
 
 		void Copy(string srcPath, string dstPath)
