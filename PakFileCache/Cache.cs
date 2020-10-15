@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace PakPatcher
+namespace PakFileCache
 {
-    class FileStats
+    public class FileStats
     {
         public DateTime MTime { get; set; }
         public Int64 Size { get; set; }
     }
 
-    class CacheId
+    public class CacheId
     { 
         public byte[] Id { get; private set; }
 
@@ -80,7 +80,7 @@ namespace PakPatcher
     }
 
 
-    class CacheObject
+    public class CacheObject
     {
         private class Meta
         {
@@ -198,7 +198,7 @@ namespace PakPatcher
     }
 
 
-    class FileCache
+    public class FileCache
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 

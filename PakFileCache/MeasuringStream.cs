@@ -9,9 +9,9 @@ using System.Threading;
 using System.Diagnostics;
 using System.Globalization;
 
-namespace PakPatcher
+namespace PakFileCache
 {
-    enum StreamPurpose
+    public enum StreamPurpose
     { 
         Source,
         Target,
@@ -19,7 +19,7 @@ namespace PakPatcher
         CacheMeta
     }
 
-    class MeasuringStream : Stream
+    public class MeasuringStream : Stream
     {
         [DebuggerDisplay("BwStat({count}, {TS}, {Speed})")]
         public struct BwStat
@@ -208,7 +208,7 @@ namespace PakPatcher
         }
     }
 
-    class StreamStatsMgr
+    public class StreamStatsMgr
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
