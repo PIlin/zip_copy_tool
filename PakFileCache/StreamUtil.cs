@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace PakFileCache
 {
-	public static class StreamUtil
+    public static class StreamUtil
 	{
 		public static void FillBuffer(Stream stream, byte[] buffer, int numBytes)
 		{

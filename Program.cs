@@ -1,15 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace PakPatcher
+﻿namespace PakPatcher
 {
-	class Program
+    class Program
 	{
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 

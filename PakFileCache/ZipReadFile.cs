@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace PakFileCache
 {
 
-	class CDREnd
+    class CDREnd
 	{
 		public const uint SIGNATURE = 0x06054b50;
 		public const long SIZE = 4 + (4 * 2) + (2 * 4) + 2;
