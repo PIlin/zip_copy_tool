@@ -38,10 +38,53 @@ namespace PakFileCache
 			logger.Info("Processing {0} done in {1}", src, startTime.Elapsed);
 		}
 
-		/// <summary>
-		/// Replicate using FileCache
-		/// </summary>
-		public static void Replicate(ZipReadFile z, FileCache fc, Stream fsOut, DateTime zipMtime)
+        public static void ReplicateUpdate(string srcV1, string srcV2, string dst)
+        {
+			string dstWork = dst;
+			if (dst == srcV1 || dst == srcV2)
+			{
+				dstWork = dst + ".new";
+                logger.Info("Processing {0} and {1} to produce {2} (writing to temporary {3})", srcV1, srcV2, dst, dstWork);
+            }
+			else
+			{
+                logger.Info("Processing {0} and {1} to produce {2}", srcV1, srcV2, dst);
+            }
+            
+            Stopwatch startTime = Stopwatch.StartNew();
+            DateTime zipMtime;
+            using (MeasuringStream fv1 = new MeasuringStream(new FileStream(srcV1, FileMode.Open), StreamPurpose.Source))
+            using (MeasuringStream fv2 = new MeasuringStream(new FileStream(srcV2, FileMode.Open), StreamPurpose.Source))
+            using (MeasuringStream fdst = new MeasuringStream(new FileStream(dstWork, FileMode.Create), StreamPurpose.Target))
+            {
+                using (BufferedStream fbv1 = new BufferedStream(fv1))
+                using (BufferedStream fbv2 = new BufferedStream(fv2))
+                {
+                    zipMtime = File.GetLastWriteTime(srcV2);
+                    ZipReadFile z1 = new ZipReadFile(fbv1);
+                    ZipReadFile z2 = new ZipReadFile(fbv2);
+                    Stopwatch startRepTime = Stopwatch.StartNew();
+                    Replicate(z1, z2, fdst);
+                    startRepTime.Stop();
+                    logger.Info("Replication done in {0}", startRepTime.Elapsed);
+                }
+            }
+
+			if (dst != dstWork)
+			{
+				File.Replace(dstWork, dst, null);
+			}
+
+            File.SetLastWriteTime(dst, zipMtime);
+
+            startTime.Stop();
+            logger.Info("Processing {0}", startTime.Elapsed);
+        }
+
+        /// <summary>
+        /// Replicate using FileCache
+        /// </summary>
+        public static void Replicate(ZipReadFile z, FileCache fc, Stream fsOut, DateTime zipMtime)
 		{
 			var zEntries = z.CDR.Entries;
 			zEntries.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));

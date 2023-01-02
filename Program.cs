@@ -1,4 +1,6 @@
-﻿namespace PakPatcher
+﻿using System.Security.Cryptography;
+
+namespace PakPatcher
 {
     class Program
 	{
@@ -36,15 +38,21 @@
 			ReplicateZipFileWithCache(@"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v2_out.zip", fc);
 		}
 
+        static void TestZipReplicate()
+		{
+            PakFileCache.ZipReplicate.ReplicateUpdate(@"d:\code\PakPatcher\test\v1.zip", @"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v1_2.zip");
+            PakFileCache.StreamStatsMgr.Instance.LogReports();
+            PakFileCache.StreamStatsMgr.Instance.Reset();
+        }
 
-		static void Main(string[] args)
+        static void Main(string[] args)
         {
 			InitLog();
 
-			//TestZipReplicate();
+			TestZipReplicate();
 
 			//TestCacheCopy();
-			TestZipCacheReplicate();
+			//TestZipCacheReplicate();
 		}
     }
 }
