@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.IO;
+using System.Security.Cryptography;
 
 namespace PakPatcher
 {
@@ -45,14 +46,32 @@ namespace PakPatcher
             PakFileCache.StreamStatsMgr.Instance.Reset();
         }
 
+        static void TestZipReplicateFuzzy()
+        {
+			string v1 = @"d:\code\PakPatcher\test\v1.zip";
+			string v2 = @"d:\code\PakPatcher\test\v2.zip";
+            string dst = @"d:\code\PakPatcher\test\v1_2.zip";
+			try
+			{
+				File.Delete(dst);
+			}
+			catch { }
+			File.Copy(v1, dst);
+
+            PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(v2, dst);
+            PakFileCache.StreamStatsMgr.Instance.LogReports();
+            PakFileCache.StreamStatsMgr.Instance.Reset();
+        }
+
         static void Main(string[] args)
         {
 			InitLog();
 
-			TestZipReplicate();
+			//TestZipReplicate();
+			TestZipReplicateFuzzy();
 
-			//TestCacheCopy();
-			//TestZipCacheReplicate();
-		}
+            //TestCacheCopy();
+            //TestZipCacheReplicate();
+        }
     }
 }

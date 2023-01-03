@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 
 namespace PakFileCache
 {
@@ -36,6 +38,30 @@ namespace PakFileCache
 			lCDROffset = br.ReadUInt32();
 			nCommentLength = br.ReadUInt16();
 		}
+
+		public CDREnd(uint offset, uint size, ushort numEntries)
+		{
+			lSignature = SIGNATURE;
+			nDisk = 0;
+			nCDRStartDisk = 0;
+			numEntriesOnDisk = numEntries;
+			numEntriesTotal = numEntries;
+			lCDRSize = size;
+			lCDROffset = offset;
+			nCommentLength = 0;
+		}
+
+		public void Write(BinaryWriter bw)
+		{
+            bw.Write((UInt32)lSignature);
+            bw.Write((UInt16)nDisk);
+            bw.Write((UInt16)nCDRStartDisk);
+            bw.Write((UInt16)numEntriesOnDisk);
+            bw.Write((UInt16)numEntriesTotal);
+            bw.Write((UInt32)lCDRSize);
+            bw.Write((UInt32)lCDROffset);
+            bw.Write((UInt16)nCommentLength);
+        }
 	}
 
 	[Flags]
@@ -154,7 +180,13 @@ namespace PakFileCache
 		//		return lSizeCompressed == (ulong) ZIP64_SEE_EXTENSION || lSizeUncompressed == (ulong) ZIP64_SEE_EXTENSION;
 		//	}
 
-	}
+		public void Write(BinaryWriter bw)
+		{
+			bw.Write((UInt32)lCRC32);
+			bw.Write((UInt32)lSizeCompressed);
+            bw.Write((UInt32)lSizeUncompressed);
+        }
+    }
 
 
 	public class CDRFileHeader
@@ -193,7 +225,10 @@ namespace PakFileCache
 
 		public long CdrRecordSize => CDRFileHeader.SIZE + nFileNameLength + nExtraFieldLength + nFileCommentLength;
 
-		public CDRFileHeader(BinaryReader br)
+		public uint FullRecordSize => (uint)LocalFileHeader.SIZE + nFileNameLength + nExtraFieldLength + desc.lSizeCompressed;
+
+
+        public CDRFileHeader(BinaryReader br)
 		{
 			lSignature = br.ReadUInt32();
 			if (lSignature != SIGNATURE)
@@ -220,7 +255,54 @@ namespace PakFileCache
 			FileName = Encoding.UTF8.GetString(filenameBytes);
 		}
 
-		public string FormatLastModTime()
+		public CDRFileHeader(CDRFileHeader h)
+		{
+            lSignature = h.lSignature;
+            nVersionMadeBy = h.nVersionMadeBy;
+            nVersionNeeded = h.nVersionNeeded;
+            nFlags = h.nFlags;
+            nMethod = h.nMethod;
+            nLastModTime = h.nLastModTime;
+            nLastModDate = h.nLastModDate;
+            desc = h.desc;
+            nFileNameLength = h.nFileNameLength;
+            nExtraFieldLength = h.nExtraFieldLength;
+            nFileCommentLength = h.nFileCommentLength;
+            nDiskNumberStart = h.nDiskNumberStart;
+            nAttrInternal = h.nAttrInternal;
+            lAttrExternal = h.lAttrExternal;
+            lLocalHeaderOffset = h.lLocalHeaderOffset;
+            filenameBytes = h.filenameBytes;
+            extraField = h.extraField;
+            comment = h.comment;
+            FileName = h.FileName;
+        }
+
+        public CDRFileHeader(CDRFileHeader h, uint newLocalHeaderOffset)
+        {
+            lSignature = h.lSignature;
+            nVersionMadeBy = h.nVersionMadeBy;
+            nVersionNeeded = h.nVersionNeeded;
+            nFlags = h.nFlags;
+            nMethod = h.nMethod;
+            nLastModTime = h.nLastModTime;
+            nLastModDate = h.nLastModDate;
+            desc = h.desc;
+            nFileNameLength = h.nFileNameLength;
+            nExtraFieldLength = h.nExtraFieldLength;
+            nFileCommentLength = h.nFileCommentLength;
+            nDiskNumberStart = h.nDiskNumberStart;
+            nAttrInternal = h.nAttrInternal;
+            lAttrExternal = h.lAttrExternal;
+            lLocalHeaderOffset = newLocalHeaderOffset;
+            filenameBytes = h.filenameBytes;
+            extraField = h.extraField;
+            comment = h.comment;
+            FileName = h.FileName;
+        }
+
+
+        public string FormatLastModTime()
 		{
 			ushort t = nLastModTime;
 			int hour = t >> 11;
@@ -237,7 +319,34 @@ namespace PakFileCache
 			int day = d & 0x1F;
 			return string.Format("{0:D4}:{1:D2}:{2:D2}", year, mon, day);
 		}
-	}
+
+		public void Write(BinaryWriter bw)
+		{
+			bw.Write(lSignature);
+			bw.Write((UInt16)nVersionMadeBy);
+            bw.Write((UInt16)nVersionNeeded);
+            bw.Write((UInt16)nFlags);
+            bw.Write((UInt16)nMethod);
+            bw.Write((UInt16)nLastModTime);
+            bw.Write((UInt16)nLastModDate);
+			desc.Write(bw);
+            bw.Write((UInt16)nFileNameLength);
+            bw.Write((UInt16)nExtraFieldLength);
+            bw.Write((UInt16)nFileCommentLength);
+            bw.Write((UInt16)nDiskNumberStart);
+            bw.Write((UInt16)nAttrInternal);
+            bw.Write((UInt32)lAttrExternal);
+            bw.Write((UInt32)lLocalHeaderOffset);
+
+			bw.Write(filenameBytes);
+			bw.Write(extraField);
+			bw.Write(comment);
+        }
+		public override string ToString()
+		{
+			return $"{lLocalHeaderOffset}: {FileName}";
+        }
+    }
 
 	public class LocalFileHeader
 	{
