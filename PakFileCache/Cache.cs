@@ -228,6 +228,7 @@ namespace PakFileCache
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
+        public bool Enabled { get; private set; }
         public string Root { get; set; }
         public Int64 SmallFileSize { get; set; } = 2 * 1024;
         public List<Regex> ExcludeNamePatterns { get; set; } = new List<Regex>();
@@ -236,12 +237,21 @@ namespace PakFileCache
 
         public FileCache(string root)
         {
+            Enabled = true;
             Root = root;
             Directory.CreateDirectory(Root);
         }
 
+        public FileCache()
+        {
+            Enabled = false;
+        }
+
+
         public CacheObject Add(string filepath, ICacheIdGenerator idGen)
         {
+            if (!Enabled) throw new InvalidOperationException("FileCache is not enabled");
+
             using (MeasuringStream s = new MeasuringStream(new FileStream(filepath, FileMode.Open), StreamPurpose.Source))
             {
                 return Add(s, filepath, idGen);
@@ -250,12 +260,16 @@ namespace PakFileCache
 
         public CacheObject Add(Stream f, string filepath, ICacheIdGenerator idGen)
         {
+            if (!Enabled) throw new InvalidOperationException("FileCache is not enabled");
+
             FileStats stats = FileCacheUtil.GetFileStats(f, filepath);
             return Add(f, filepath, stats, idGen);
         }
 
         CacheObject Add(Stream f, string filepath, FileStats stats, ICacheIdGenerator idGen)
         {
+            if (!Enabled) throw new InvalidOperationException("FileCache is not enabled");
+
             if (idGen == null)
             {
                 idGen = DefaultCacheIdGenerator;
@@ -280,6 +294,8 @@ namespace PakFileCache
 
         public CacheObject AddFromStream(CacheId id, string name, FileStats stats, Stream s)
         {
+            if (!Enabled) throw new InvalidOperationException("FileCache is not enabled");
+
             CacheObject co = new CacheObject(id, Root);
             if (co.IsPathValid())
             {
@@ -297,6 +313,8 @@ namespace PakFileCache
 
         private bool IsFileAllowedForCache(string srcFilepath, FileStats stats)
         {
+            if (!Enabled) return false;
+
             if (stats.Size < SmallFileSize)
                 return false;
             string name = Path.GetFileName(srcFilepath);

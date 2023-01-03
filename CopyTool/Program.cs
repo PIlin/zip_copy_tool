@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.IO;
+using System.Diagnostics;
 
 namespace CopyTool
 {
@@ -14,6 +15,14 @@ namespace CopyTool
 
 		private static char[] s_dirSeparators = new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 
+		class Settings
+		{
+            public string fileCachePath = "";
+			public bool copyZipFuzzy = false;
+        }
+
+
+		Settings m_settings = new Settings();
 		PakFileCache.FileCache m_fileCache;
 
 		static void InitLog()
@@ -66,8 +75,6 @@ namespace CopyTool
 
 		void Exec(string[] args)
 		{
-			string fileCachePath = "";
-
 			int i = 0;
 			while (i < args.Length - 2)
 			{
@@ -75,11 +82,16 @@ namespace CopyTool
 				{
 					if (args[i + 1][0] != '-')
 					{
-						fileCachePath = NormalizePath(args[i + 1]);
+						m_settings.fileCachePath = NormalizePath(args[i + 1]);
 						i += 2;
 					}
 					else
 						throw new ArgumentException("--cache requires file path", "cache");
+				}
+				else if (args[i] == "--fuzzy")
+				{
+					m_settings.copyZipFuzzy = true;
+					i += 1;
 				}
 			}
 
@@ -91,16 +103,23 @@ namespace CopyTool
 			string srcPath = NormalizePath(args[i++]);
 			string dstPath = NormalizePath(args[i++]);
 
-			InitFileCache(fileCachePath);
+			InitFileCache(m_settings.fileCachePath);
 
 			Copy(srcPath, dstPath);
-		}
+
+            PakFileCache.StreamStatsMgr.Instance.LogReports();
+            PakFileCache.StreamStatsMgr.Instance.Reset();
+        }
 
 		void InitFileCache(string fileCachePath)
 		{
 			EPathType cachePathType = CheckPathType(fileCachePath);
 			if (cachePathType == EPathType.File || cachePathType == EPathType.None)
-				throw new ArgumentException($"Invalid file cache path {fileCachePath}", "cache");
+			{
+				logger.Info($"Invalid file cache path {fileCachePath}, working without cache");
+				m_fileCache = new PakFileCache.FileCache();
+				return;
+			}
 
 			m_fileCache = new PakFileCache.FileCache(fileCachePath);
 
@@ -120,23 +139,48 @@ namespace CopyTool
 				throw new ArgumentException($"srcFile and dstPath have different types: src {srcPathType}, dst {dstPathType}");
 
 			if (srcPathType == EPathType.File)
-				CopyFile(srcPath, dstPath);
+				CopyFile(srcPath, dstPath, dstPathType);
 			else if (srcPathType == EPathType.Dir)
 				CopyDir(srcPath, dstPath);
-
-			PakFileCache.StreamStatsMgr.Instance.LogReports();
-			PakFileCache.StreamStatsMgr.Instance.Reset();
 		}
 
-		void CopyFile(string srcPath, string dstPath)
+		void CopyFile(string srcPath, string dstPath, EPathType dstPathType)
 		{
 			string srcExt = Path.GetExtension(srcPath);
 			if (srcExt == ".zip" || srcExt == ".pak")
 			{
-				logger.Info("Copy zip {0} to {1}", srcPath, dstPath);
-				PakFileCache.ZipReplicate.ReplicateZipFileWithCache(srcPath, dstPath, m_fileCache);
+				try
+				{
+					if (m_fileCache.Enabled)
+					{
+                        logger.Info("Replicate zip {0} to {1}", srcPath, dstPath);
+                        PakFileCache.ZipReplicate.ReplicateZipFileWithCache(srcPath, dstPath, m_fileCache);
+						return;
+                    }
+
+					if (dstPathType != EPathType.None)
+					{
+
+						if (m_settings.copyZipFuzzy)
+						{
+							logger.Info("Replicate zip {0} to {1} with fuzzy update", srcPath, dstPath);
+							PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(srcPath, dstPath);
+						}
+						else
+						{
+							logger.Info("Replicate zip {0} to {1} with update", srcPath, dstPath);
+							PakFileCache.ZipReplicate.ReplicateUpdate(dstPath, srcPath, dstPath);
+						}
+						return;
+					}
+					Debug.Assert(dstPathType == EPathType.None);
+				}
+				catch (Exception e)
+				{
+					logger.Warn(e, "Failed to replicate zip file, retry as normal file copy");
+				}
 			}
-			else
+			
 			{
 				logger.Info("Copy {0} to {1}", srcPath, dstPath);
 				m_fileCache.CopyFile(srcPath, dstPath);
@@ -154,7 +198,7 @@ namespace CopyTool
 					string dstDir = Path.Combine(dstPath, srcRelDir);
 					string dstFilepath = Path.Combine(dstDir, Path.GetFileName(srcFilepath));
 					Directory.CreateDirectory(dstDir);
-					CopyFile(srcFilepath, dstFilepath);
+					Copy(srcFilepath, dstFilepath);
 				}
 				else
                 {
