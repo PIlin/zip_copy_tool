@@ -18,7 +18,7 @@ namespace CopyTool
 		class Settings
 		{
             public string fileCachePath = "";
-			public bool copyZipFuzzy = false;
+			public bool copyZipFuzzy = true;
         }
 
 
@@ -93,7 +93,12 @@ namespace CopyTool
 					m_settings.copyZipFuzzy = true;
 					i += 1;
 				}
-			}
+                else if (args[i] == "--no-fuzzy")
+                {
+                    m_settings.copyZipFuzzy = false;
+                    i += 1;
+                }
+            }
 
 			if (args.Length < i + 2)
 			{
