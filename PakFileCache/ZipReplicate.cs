@@ -3,15 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Security;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using System.Windows;
 
 namespace PakFileCache
 {
-    public static class ZipReplicate
+	public static class ZipReplicate
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         public const bool HackIgnoreLFHVersionNeeded = true;
@@ -122,7 +119,7 @@ namespace PakFileCache
         public static void Replicate(ZipReadFile z, FileCache fc, Stream fsOut, DateTime zipMtime)
 		{
 			var zEntries = z.CDR.Entries;
-			zEntries.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+			zEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 			byte[] localHeaderBuf = new byte[LocalFileHeader.SIZE];
 			byte[] fileNameBuf = new byte[256];
@@ -130,30 +127,30 @@ namespace PakFileCache
 			long expectedPos = 0;
 			foreach (var rec in zEntries)
 			{
-				if (rec.lLocalHeaderOffset != expectedPos)
-					throw new FileFormatException($"Unable to replicate zip - data stream has holes. File {rec.FileName}, expected offset {expectedPos:x}, actual offset {rec.lLocalHeaderOffset:x}");
+				if (rec.localHeaderOffset != expectedPos)
+					throw new FileFormatException($"Unable to replicate zip - data stream has holes. File {rec.FileName}, expected offset {expectedPos:x}, actual offset {rec.localHeaderOffset:x}");
 
-				z.Stream.Seek(rec.lLocalHeaderOffset, SeekOrigin.Begin);
+				z.Stream.Seek(rec.localHeaderOffset, SeekOrigin.Begin);
 				StreamUtil.FillBuffer(z.Stream, localHeaderBuf, localHeaderBuf.Length);
 
 				LocalFileHeader lfh = new LocalFileHeader(localHeaderBuf);
 				if (!lfh.Check(rec, HackIgnoreLFHVersionNeeded))
 					throw new FileFormatException($"LocalFileHeader failed check. File {rec.FileName}");
 
-				fileNameBuf = StreamUtil.ReadBuffer(z.Stream, fileNameBuf, lfh.nFileNameLength);
-				if (!CompareFilenameBuffer(fileNameBuf, lfh.nFileNameLength, rec))
+				fileNameBuf = StreamUtil.ReadBuffer(z.Stream, fileNameBuf, lfh.fileNameSize);
+				if (!CompareFilenameBuffer(fileNameBuf, lfh.fileNameSize, rec))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {rec.FileName}");
 
 				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
-				fsOut.Write(fileNameBuf, 0, lfh.nFileNameLength);
-				StreamUtil.CopyNTo(z.Stream, fsOut, lfh.nExtraFieldLength);
+				fsOut.Write(fileNameBuf, 0, lfh.fileNameSize);
+				StreamUtil.CopyNTo(z.Stream, fsOut, lfh.extraFieldSize);
 
 				long dataPos = z.Stream.Position;
-				long curExpectedPos = expectedPos + LocalFileHeader.SIZE + lfh.nFileNameLength + lfh.nExtraFieldLength;
+				long curExpectedPos = expectedPos + LocalFileHeader.SIZE + lfh.fileNameSize + lfh.extraFieldSize;
 				if (curExpectedPos != dataPos)
 					throw new FileFormatException($"Unable to replicate zip - data stream has holes. data expected offset {curExpectedPos:x}, actual offset {dataPos:x}");
 
-				long size = lfh.desc.lSizeCompressed;
+				long size = lfh.desc.sizeCompressed;
 
 				if (size >= fc.SmallFileSize)
 				{
@@ -167,7 +164,7 @@ namespace PakFileCache
 					StreamUtil.CopyNTo(z.Stream, fsOut, size);
 				}
 
-				expectedPos += LocalFileHeader.SIZE + lfh.nFileNameLength + lfh.nExtraFieldLength + size;
+				expectedPos += LocalFileHeader.SIZE + lfh.fileNameSize + lfh.extraFieldSize + size;
 			}
 
 			if (z.CDROffset != expectedPos)
@@ -187,7 +184,7 @@ namespace PakFileCache
 		public static void Replicate(ZipReadFile z1, ZipReadFile z2, Stream fsOut)
 		{
 			var z2Entries = z2.CDR.Entries;
-			z2Entries.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+			z2Entries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 			byte[] localHeaderBuf = new byte[LocalFileHeader.SIZE];
 			byte[] fileNameBuf = new byte[256];
@@ -195,8 +192,8 @@ namespace PakFileCache
 			long expectedPos = 0;
 			foreach (var rec in z2Entries)
 			{
-				if (rec.lLocalHeaderOffset != expectedPos)
-					throw new FileFormatException($"Unable to replicate zip - data stream has holes. File {rec.FileName}, expected offset {expectedPos:x}, actual offset {rec.lLocalHeaderOffset:x}");
+				if (rec.localHeaderOffset != expectedPos)
+					throw new FileFormatException($"Unable to replicate zip - data stream has holes. File {rec.FileName}, expected offset {expectedPos:x}, actual offset {rec.localHeaderOffset:x}");
 
 				string debugReason;
 				var srcRec = FindSameFile(rec, z1.CDR, out debugReason);
@@ -213,23 +210,23 @@ namespace PakFileCache
 					logger.Info("Copying {0} from z2 because {1}", srcRec.FileName, debugReason);
 				}
 
-				srcStream.Seek(srcRec.lLocalHeaderOffset, SeekOrigin.Begin);
+				srcStream.Seek(srcRec.localHeaderOffset, SeekOrigin.Begin);
 				StreamUtil.FillBuffer(srcStream, localHeaderBuf, localHeaderBuf.Length);
 
 				LocalFileHeader lfh = new LocalFileHeader(localHeaderBuf);
 				if (!lfh.Check(srcRec, HackIgnoreLFHVersionNeeded))
 					throw new FileFormatException($"LocalFileHeader failed check. File {srcRec.FileName}");
 
-				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.nFileNameLength);
-				if (!CompareFilenameBuffer(fileNameBuf, lfh.nFileNameLength, rec))
+				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.fileNameSize);
+				if (!CompareFilenameBuffer(fileNameBuf, lfh.fileNameSize, rec))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {srcRec.FileName}");
 
 				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
-				fsOut.Write(fileNameBuf, 0, lfh.nFileNameLength);
-				long size = lfh.nExtraFieldLength + lfh.desc.lSizeCompressed;
+				fsOut.Write(fileNameBuf, 0, lfh.fileNameSize);
+				long size = lfh.extraFieldSize + lfh.desc.sizeCompressed;
 				StreamUtil.CopyNTo(srcStream, fsOut, size);
 
-				expectedPos += LocalFileHeader.SIZE + lfh.nFileNameLength + size;
+				expectedPos += LocalFileHeader.SIZE + lfh.fileNameSize + size;
 			}
 			if (z2.CDROffset != expectedPos)
 				throw new FileFormatException($"Unable to replicate zip - data stream has holes. CDR expected offset {expectedPos:x}, actual offset {z2.CDROffset:x}");
@@ -404,16 +401,16 @@ namespace PakFileCache
 		public static void ReplicateFuzzy(ZipReadFile zsrc, ZipReadFile zdst, Stream fsOut)
         {
 			var zsrcEntries = zsrc.CDR.Entries;
-            zsrcEntries.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+            zsrcEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
             var zdstEntries = zdst.CDR.Entries;
-            zdstEntries.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+            zdstEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 			var segments = new SegmentsList();
             for (int i = 0; i < zdstEntries.Count; ++i)
 			{
 				var entry = zdstEntries[i];
-                segments.PushSegment(new Segment(entry.FileName, entry.lLocalHeaderOffset, entry.lLocalHeaderOffset + entry.FullRecordSize));
+                segments.PushSegment(new Segment(entry.FileName, entry.localHeaderOffset, entry.localHeaderOffset + entry.FullRecordSize));
             }
             
             List<CDRFileHeader> toKeepInDstCdr = new List<CDRFileHeader>(zdstEntries.Count);
@@ -459,7 +456,7 @@ namespace PakFileCache
                     toUpdateFromSrcCdr.Add(rec);
 				}
             }
-            toUpdateFromSrcCdr.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+            toUpdateFromSrcCdr.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 
             // merge holes
@@ -489,28 +486,28 @@ namespace PakFileCache
 				Segment seg = new Segment(srcRec.FileName, hole.start, hole.start + srcRec.FullRecordSize);
 				segments.FillHole(ihole, hole, seg);
 
-				srcStream.Seek(srcRec.lLocalHeaderOffset, SeekOrigin.Begin);
+				srcStream.Seek(srcRec.localHeaderOffset, SeekOrigin.Begin);
 				StreamUtil.FillBuffer(srcStream, localHeaderBuf, localHeaderBuf.Length);
 
 				LocalFileHeader lfh = new LocalFileHeader(localHeaderBuf);
 				if (!lfh.Check(srcRec, HackIgnoreLFHVersionNeeded))
 					throw new FileFormatException($"LocalFileHeader failed check. File {srcRec.FileName}");
 
-				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.nFileNameLength);
-				if (!CompareFilenameBuffer(fileNameBuf, lfh.nFileNameLength, srcRec))
+				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.fileNameSize);
+				if (!CompareFilenameBuffer(fileNameBuf, lfh.fileNameSize, srcRec))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {srcRec.FileName}");
 
 				fsOut.Seek(seg.start, SeekOrigin.Begin);
 				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
-				fsOut.Write(fileNameBuf, 0, lfh.nFileNameLength);
-				long size = lfh.nExtraFieldLength + lfh.desc.lSizeCompressed;
+				fsOut.Write(fileNameBuf, 0, lfh.fileNameSize);
+				long size = lfh.extraFieldSize + lfh.desc.sizeCompressed;
 				StreamUtil.CopyNTo(srcStream, fsOut, size);
 
 				var dstRec = new CDRFileHeader(srcRec, seg.start);
 				newCdr.Add(dstRec);
             }
 			newCdr.AddRange(toKeepInDstCdr);
-            newCdr.Sort((a, b) => a.lLocalHeaderOffset.CompareTo(b.lLocalHeaderOffset));
+            newCdr.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 			Debug.Assert(newCdr.Count == zsrc.CDR.Entries.Count);
 
@@ -536,8 +533,12 @@ namespace PakFileCache
 				uint cdrEnd = (uint)fsOut.Position;
 
 				Debug.Assert(newCdr.Count <= ushort.MaxValue);
-				CDREnd end = new CDREnd(cdrStart, cdrEnd - cdrStart, (ushort)newCdr.Count);
+				CDREnd end = new CDREnd(cdrStart, cdrEnd - cdrStart, (ushort)newCdr.Count, zsrc.CDR.Comment);
 				end.Write(bw);
+				if (zsrc.CDR.Comment != null)
+				{
+					bw.Write(zsrc.CDR.Comment);
+				}
             }
 
 			fsOut.SetLength(fsOut.Position);
@@ -560,18 +561,18 @@ namespace PakFileCache
 		static bool IsSameFile(CDRFileHeader src, CDRFileHeader query, out string debugReason)
 		{
             if (!src.desc.Equals(query.desc)) { debugReason = "size or crc"; return false; }
-            if (!(src.nLastModTime == query.nLastModTime)) { debugReason = "nLastModTime"; return false; }
-            if (!(src.nLastModDate == query.nLastModDate)) { debugReason = "nLastModDate"; return false; }
-            if (!(src.nVersionMadeBy == query.nVersionMadeBy)) { debugReason = "nVersionMadeBy"; return false; }
-            if (!(src.nVersionNeeded == query.nVersionNeeded)) { debugReason = "nVersionNeeded"; return false; }
-            if (!(src.nFlags == query.nFlags)) { debugReason = "nFlags"; return false; }
-            if (!(src.nMethod == query.nMethod)) { debugReason = "nMethod"; return false; }
-            if (!(src.nFileNameLength == query.nFileNameLength)) { debugReason = "nFileNameLength"; return false; }
-            if (!(src.nExtraFieldLength == query.nExtraFieldLength)) { debugReason = "nExtraFieldLength"; return false; }
-            if (!(src.nFileCommentLength == query.nFileCommentLength)) { debugReason = "nFileCommentLength"; return false; }
-            if (!(src.nDiskNumberStart == query.nDiskNumberStart)) { debugReason = "nDiskNumberStart"; return false; }
-            if (!(src.nAttrInternal == query.nAttrInternal)) { debugReason = "nAttrInternal"; return false; }
-            if (!(src.lAttrExternal == query.lAttrExternal)) { debugReason = "lAttrExternal"; return false; }
+            if (!(src.modTime == query.modTime)) { debugReason = "nLastModTime"; return false; }
+            if (!(src.modDate == query.modDate)) { debugReason = "nLastModDate"; return false; }
+            if (!(src.createVersion == query.createVersion)) { debugReason = "nVersionMadeBy"; return false; }
+            if (!(src.extractVersion == query.extractVersion)) { debugReason = "nVersionNeeded"; return false; }
+            if (!(src.flags == query.flags)) { debugReason = "nFlags"; return false; }
+            if (!(src.method == query.method)) { debugReason = "nMethod"; return false; }
+            if (!(src.fileNameSize == query.fileNameSize)) { debugReason = "nFileNameLength"; return false; }
+            if (!(src.extraFieldSize == query.extraFieldSize)) { debugReason = "nExtraFieldLength"; return false; }
+            if (!(src.commentLength == query.commentLength)) { debugReason = "nFileCommentLength"; return false; }
+            if (!(src.diskNumberStart == query.diskNumberStart)) { debugReason = "nDiskNumberStart"; return false; }
+            if (!(src.internalFileAttributes == query.internalFileAttributes)) { debugReason = "nAttrInternal"; return false; }
+            if (!(src.externalFileAttributes == query.externalFileAttributes)) { debugReason = "lAttrExternal"; return false; }
             if (!src.filenameBytes.SequenceEqual(query.filenameBytes)) { debugReason = "filenameBytes"; return false; }
             if (!src.extraField.SequenceEqual(query.extraField)) { debugReason = "extraField"; return false; }
             if (!src.comment.SequenceEqual(query.comment)) { debugReason = "comment"; return false; }
@@ -604,25 +605,25 @@ namespace PakFileCache
 				{
 					throw new NotImplementedException("BigEndian support is not implmeneted");
 				}
-				if (rec.nExtraFieldLength != 0)
+				if (rec.extraFieldSize != 0)
 				{
-					throw new NotImplementedException($"Support for nExtraFieldLength = {rec.nExtraFieldLength} > 0 is not implemented");
+					throw new NotImplementedException($"Support for nExtraFieldLength = {rec.extraFieldSize} > 0 is not implemented");
 				}
 
 				if (!HackIgnoreLFHVersionNeeded)
 				{
 #pragma warning disable CS0162 // Unreachable code detected
-					h.AppendData(BitConverter.GetBytes((Int16)rec.nVersionNeeded));
+					h.AppendData(BitConverter.GetBytes((Int16)rec.extractVersion));
 #pragma warning restore CS0162 // Unreachable code detected
 				}
-				h.AppendData(BitConverter.GetBytes((Int16)rec.nFlags));
+				h.AppendData(BitConverter.GetBytes((Int16)rec.flags));
 				// TODO: does modtime matter? Maybe not
 				//h.AppendData(BitConverter.GetBytes(rec.nLastModTime));
 				//h.AppendData(BitConverter.GetBytes(rec.nLastModDate));
 
-				h.AppendData(BitConverter.GetBytes(rec.desc.lCRC32));
-				h.AppendData(BitConverter.GetBytes(rec.desc.lSizeCompressed));
-				h.AppendData(BitConverter.GetBytes(rec.desc.lSizeUncompressed));
+				h.AppendData(BitConverter.GetBytes(rec.desc.crc32));
+				h.AppendData(BitConverter.GetBytes(rec.desc.sizeCompressed));
+				h.AppendData(BitConverter.GetBytes(rec.desc.sizeUncompressed));
 
 				return new CacheId(h.GetHashAndReset());
 			}
