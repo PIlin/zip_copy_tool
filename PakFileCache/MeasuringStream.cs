@@ -279,11 +279,19 @@ namespace PakFileCache
             {
                 string filePath = stream.Name;
 
-                var di = new DriveInfo(Path.GetPathRoot(filePath));
+                var rootPath = Path.GetPathRoot(filePath);
+                DiskReportKey k;
+                if (rootPath.StartsWith("\\\\"))
+                {
+                    k = new DiskReportKey() { Name = rootPath, DriveType = DriveType.Network };
+                }
+                else
+                {
+                    var di = new DriveInfo(rootPath);
+                    k = new DiskReportKey() { Name = di.Name, DriveType = di.DriveType };
+                }
 
-                var k = new DiskReportKey() { Name = di.Name, DriveType = di.DriveType };
                 GetOrAddReport(ReportsByDisk, k).AddToReport(stream);
-
                 GetOrAddReport(ReportsByPurpose, stream.Purpose).AddToReport(stream);
             }
         }
