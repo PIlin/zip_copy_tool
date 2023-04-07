@@ -98,6 +98,11 @@ namespace CopyTool
                     m_settings.copyZipFuzzy = false;
                     i += 1;
                 }
+				else
+				{
+					logger.Warn("Unknown argument {0}: {1}", i, args[i]);
+					i++;
+				}
             }
 
 			if (args.Length < i + 2)
