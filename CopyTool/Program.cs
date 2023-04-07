@@ -194,7 +194,12 @@ namespace CopyTool
 
 		void CopyDir(string srcPath, string dstPath)
 		{
-			foreach (string srcFilepath in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
+			logger.Info("Enumerating files in {0}", srcPath);
+			List<string> srcFiles = new List<string>();
+			List<string> dstFiles = new List<string>();
+			HashSet<string> dstDirs = new HashSet<string>();
+
+            foreach (string srcFilepath in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
 			{
 				string srcDir = Path.GetDirectoryName(srcFilepath);
 				if (srcDir.StartsWith(srcPath))
@@ -202,15 +207,31 @@ namespace CopyTool
 					string srcRelDir = srcDir.Remove(0, srcPath.Length).Trim(s_dirSeparators);
 					string dstDir = Path.Combine(dstPath, srcRelDir);
 					string dstFilepath = Path.Combine(dstDir, Path.GetFileName(srcFilepath));
-					Directory.CreateDirectory(dstDir);
-					Copy(srcFilepath, dstFilepath);
+
+					srcFiles.Add(srcFilepath);
+					dstFiles.Add(dstFilepath);
+					dstDirs.Add(dstDir);
+
 				}
 				else
                 {
-					throw new Exception($"Unable to retrieve path of file {srcFilepath} relative to {srcPath}");
-                }
+					logger.Warn("Unable to retrieve path of file {0} relative to {1}", srcFilepath, srcPath);
+				}
 			}
-		}
+
+			Debug.Assert(srcFiles.Count == dstFiles.Count);
+            logger.Info("Found {0} files", srcFiles.Count);
+
+			foreach (string dir in dstDirs)
+			{
+                Directory.CreateDirectory(dir);
+            }
+
+			for (int i = 0; i < srcFiles.Count; ++i)
+			{
+				Copy(srcFiles[i], dstFiles[i]);
+			}
+        }
 
 	}
 }
