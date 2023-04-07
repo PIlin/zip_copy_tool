@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace PakFileCache
 {
@@ -245,6 +247,22 @@ namespace PakFileCache
             #endregion
         }
 
+        class StreamReportReq
+        {
+            public string FilePath { get; }
+            public MeasuringStream.BwStat Read { get; }
+            public MeasuringStream.BwStat Write { get; }
+            public StreamPurpose Purpose { get; }
+
+            public StreamReportReq(MeasuringStream stream)
+            {
+                FilePath = stream.Name;
+                Read = stream.StatRead;
+                Write = stream.StatWrite;
+                Purpose = stream.Purpose;
+            }
+        }
+
         class DiskReport
         {
             public MeasuringStream.BwStat Read { get; set; } = new MeasuringStream.BwStat();
@@ -252,16 +270,24 @@ namespace PakFileCache
 
             public int StreamCount { get; set; } = 0;
 
-            public void AddToReport(MeasuringStream stream)
+            public void AddToReport(StreamReportReq report)
             {
-                Read += stream.StatRead;
-                Write += stream.StatWrite;
+                Read += report.Read;
+                Write += report.Write;
                 StreamCount += 1;
             }
         }
 
         Dictionary<DiskReportKey, DiskReport> ReportsByDisk { get; } = new Dictionary<DiskReportKey, DiskReport>();
         Dictionary<StreamPurpose, DiskReport> ReportsByPurpose { get; } = new Dictionary<StreamPurpose, DiskReport>();
+
+
+        private ActionBlock<StreamReportReq> m_reportBlock;
+
+        StreamStatsMgr()
+        {
+            m_reportBlock = new ActionBlock<StreamReportReq>(AddStreamImpl);
+        }
 
         private DiskReport GetOrAddReport<D, K>(D dict, K key) where D : IDictionary<K, DiskReport>
         {
@@ -273,11 +299,11 @@ namespace PakFileCache
             return value;
         }
 
-        public void AddStream(MeasuringStream stream)
+        private void AddStreamImpl(StreamReportReq req)
         {
             lock (this)
             {
-                string filePath = stream.Name;
+                string filePath = req.FilePath;
 
                 var rootPath = Path.GetPathRoot(filePath);
                 DiskReportKey k;
@@ -291,13 +317,23 @@ namespace PakFileCache
                     k = new DiskReportKey() { Name = di.Name, DriveType = di.DriveType };
                 }
 
-                GetOrAddReport(ReportsByDisk, k).AddToReport(stream);
-                GetOrAddReport(ReportsByPurpose, stream.Purpose).AddToReport(stream);
+                GetOrAddReport(ReportsByDisk, k).AddToReport(req);
+                GetOrAddReport(ReportsByPurpose, req.Purpose).AddToReport(req);
             }
+        }
+
+        public void AddStream(MeasuringStream stream)
+        {
+            StreamReportReq report = new StreamReportReq(stream);
+            m_reportBlock.Post(report);
         }
 
         public void LogReports()
         {
+            m_reportBlock.Complete();
+            m_reportBlock.Completion.Wait();
+            m_reportBlock = new ActionBlock<StreamReportReq>(AddStreamImpl);
+
             lock (this)
             {
                 logger.Info(() =>

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.IO;
 using System.Diagnostics;
+using System.Threading.Tasks.Dataflow;
 
 namespace CopyTool
 {
@@ -21,8 +22,9 @@ namespace CopyTool
 			public bool copyZipFuzzy = true;
         }
 
+        private ActionBlock<CopyFileRequest> m_copyFileBlock;
 
-		Settings m_settings = new Settings();
+        Settings m_settings = new Settings();
 		PakFileCache.FileCache m_fileCache;
 
 		static void InitLog()
@@ -118,7 +120,15 @@ namespace CopyTool
 
 			InitFileCache(m_settings.fileCachePath);
 
-			Copy(srcPath, dstPath);
+            m_copyFileBlock = new ActionBlock<CopyFileRequest>(CopyFile);
+
+            Copy(srcPath, dstPath);
+
+			m_copyFileBlock.Complete();
+			logger.Info("Awaiting copy completion");
+			m_copyFileBlock.Completion.Wait();
+            logger.Info("Copy completed");
+
 
             PakFileCache.StreamStatsMgr.Instance.LogReports();
             PakFileCache.StreamStatsMgr.Instance.Reset();
@@ -152,41 +162,49 @@ namespace CopyTool
 				throw new ArgumentException($"srcFile and dstPath have different types: src {srcPathType}, dst {dstPathType}");
 
 			if (srcPathType == EPathType.File)
-				CopyFile(srcPath, dstPath, dstPathType);
+			{
+				m_copyFileBlock.Post(new CopyFileRequest { srcPath = srcPath, dstPath = dstPath, dstPathType = dstPathType });
+			}
 			else if (srcPathType == EPathType.Dir)
 				CopyDir(srcPath, dstPath);
 		}
 
-		void CopyFile(string srcPath, string dstPath, EPathType dstPathType)
+		class CopyFileRequest
 		{
-			string srcExt = Path.GetExtension(srcPath);
+			public string srcPath;
+			public string dstPath;
+			public EPathType dstPathType;
+        }
+		void CopyFile(CopyFileRequest req)
+		{
+			string srcExt = Path.GetExtension(req.srcPath);
 			if (srcExt == ".zip" || srcExt == ".pak")
 			{
 				try
 				{
 					if (m_fileCache.Enabled)
 					{
-                        logger.Info("Replicate zip {0} to {1}", srcPath, dstPath);
-                        PakFileCache.ZipReplicate.ReplicateZipFileWithCache(srcPath, dstPath, m_fileCache);
+                        logger.Info("Replicate zip {0} to {1}", req.srcPath, req.dstPath);
+                        PakFileCache.ZipReplicate.ReplicateZipFileWithCache(req.srcPath, req.dstPath, m_fileCache);
 						return;
                     }
 
-					if (dstPathType != EPathType.None)
+					if (req.dstPathType != EPathType.None)
 					{
 
 						if (m_settings.copyZipFuzzy)
 						{
-							logger.Info("Replicate zip {0} to {1} with fuzzy update", srcPath, dstPath);
-							PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(srcPath, dstPath);
+							logger.Info("Replicate zip {0} to {1} with fuzzy update", req.srcPath, req.dstPath);
+							PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(req.srcPath, req.dstPath);
 						}
 						else
 						{
-							logger.Info("Replicate zip {0} to {1} with update", srcPath, dstPath);
-							PakFileCache.ZipReplicate.ReplicateUpdate(dstPath, srcPath, dstPath);
+							logger.Info("Replicate zip {0} to {1} with update", req.srcPath, req.dstPath);
+							PakFileCache.ZipReplicate.ReplicateUpdate(req.dstPath, req.srcPath, req.dstPath);
 						}
 						return;
 					}
-					Debug.Assert(dstPathType == EPathType.None);
+					Debug.Assert(req.dstPathType == EPathType.None);
 				}
 				catch (Exception e)
 				{
@@ -195,8 +213,8 @@ namespace CopyTool
 			}
 			
 			{
-				logger.Info("Copy {0} to {1}", srcPath, dstPath);
-				m_fileCache.CopyFile(srcPath, dstPath);
+				logger.Info("Copy {0} to {1}", req.srcPath, req.dstPath);
+				m_fileCache.CopyFile(req.srcPath, req.dstPath);
 			}
 		}
 
