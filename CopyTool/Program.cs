@@ -28,11 +28,12 @@ namespace CopyTool
 		static void InitLog()
 		{
 			var config = new NLog.Config.LoggingConfiguration();
-			var layout = new NLog.Layouts.SimpleLayout("${longdate}|${level:uppercase=true}|${logger}|${message} ${exception:format=tostring}");
+			var layout = new NLog.Layouts.SimpleLayout("${longdate}|${threadid}|${level:uppercase=true}|${logger}|${message} ${exception:format=tostring}");
 			var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "log.txt", Layout = layout };
 			var logconsole = new NLog.Targets.ConsoleTarget("logconsole") { Layout = layout };
-			config.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logconsole);
-			config.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, logfile);
+			
+			config.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, new NLog.Targets.Wrappers.AsyncTargetWrapper(logconsole));
+			config.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, new NLog.Targets.Wrappers.AsyncTargetWrapper(logfile));
 			NLog.LogManager.Configuration = config;
 		}
 
@@ -70,7 +71,9 @@ namespace CopyTool
 				logger.Error(ex, "Failed");
 				Environment.ExitCode = -1;
 			}
-		}
+
+			NLog.LogManager.Flush();
+        }
 
 
 		void Exec(string[] args)
