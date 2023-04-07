@@ -61,8 +61,8 @@ namespace PakFileCache
 			numEntriesTotal = numEntries;
 			cdrSize = size;
 			cdrOffset = offset;
-			commentSize = (ushort)comment?.Length;
-		}
+            commentSize = (ushort)(comment != null ? comment.Length : 0);
+        }
 
 		public void Write(BinaryWriter bw)
 		{
