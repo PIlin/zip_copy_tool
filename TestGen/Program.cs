@@ -112,14 +112,14 @@ class Program
 
     static void Main(string[] args)
     {
-        if (args.Length < 4)
+        if (args.Length < 3)
         {
             Console.Error.WriteLine("Unexpected number of arguments");
             return;
         }
 
-        string v1 = args[1];
-        string v2 = args[2];
+        string v1 = args[0];
+        string v2 = args[1];
 
         Directory.CreateDirectory(v1);
         Directory.CreateDirectory(v2);
