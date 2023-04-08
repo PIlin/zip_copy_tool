@@ -1,15 +1,27 @@
 ﻿using System.Diagnostics;
 using System.IO.Compression;
-using System.Security.Cryptography;
+using System.IO.Hashing;
+using System.Text;
 
 namespace TestGen;
 class Program
 {
     enum GenEvent { New, Del, ModSame, ModDiff, Keep };
 
+    static int GetStringHash(string s)
+    {
+        Crc32 crc = new Crc32();
+        var bytes = Encoding.UTF8.GetBytes(s);
+        crc.Append(bytes);
+        var hash =  crc.GetCurrentHash();
+        return BitConverter.ToInt32(hash);
+    }
+
     static void GenerateFile(string pathV1, string pathV2, string filename)
     {
-        int seed = filename.GetHashCode();
+        int seed = GetStringHash(filename);
+
+        Console.WriteLine($"Generating {filename}, seed {seed}");
 
         pathV1 = Path.Combine(pathV1, filename);
         pathV2 = Path.Combine(pathV2, filename);
@@ -95,6 +107,7 @@ class Program
                 Console.WriteLine();
             }
         }
+        Console.WriteLine();
     }
 
     static void Main(string[] args)
