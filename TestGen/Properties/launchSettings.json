@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TestGen": {
+      "commandName": "Project",
+      "commandLineArgs": "d:\\code\\PakPatcher\\test\\gen_v1 d:\\code\\PakPatcher\\test\\gen_v2 test.zip foo.zip"
+    }
+  }
+}
