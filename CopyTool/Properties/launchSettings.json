@@ -2,7 +2,7 @@
   "profiles": {
     "CopyTool": {
       "commandName": "Project",
-      "commandLineArgs": "d:\\code\\PakPatcher/test/dir\\  d:\\code\\PakPatcher\\test\\dir_out"
+      "commandLineArgs": "d:\\code\\PakPatcher\\test\\gen_v2  d:\\code\\PakPatcher\\test\\gen_v1"
     }
   }
 }
