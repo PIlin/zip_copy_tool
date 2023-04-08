@@ -17,6 +17,13 @@ class Program
         return BitConverter.ToInt32(hash);
     }
 
+    static DateTimeOffset GenerateDTO(Random rnd, int min, int max)
+    {
+        int modtime = rnd.Next(min, max);
+        DateTimeOffset dto = DateTimeOffset.FromUnixTimeSeconds(modtime);
+        return dto;
+    }
+
     static void GenerateFile(string pathV1, string pathV2, string filename)
     {
         int seed = GetStringHash(filename);
@@ -33,6 +40,9 @@ class Program
         int sizeMin = 32 * 1024;
         int sizeMax = 4 * 1024 * 1024;
 
+        int timeMin = 1680976104;
+        int timeMax = timeMin + 100000;
+
         float newChance = 0.05f;
         float delChance = 0.02f;
         float modsameChance = 0.08f;
@@ -47,8 +57,6 @@ class Program
             chances[i] += chances[i - 1];
         }
         Debug.Assert(chances.Last() < 1.0f);
-
-        
 
         Random rnd = new Random(seed);
 
@@ -73,15 +81,19 @@ class Program
                 var s = new Span<byte>(buffer, 0, size);
                 rnd.NextBytes(s);
                 string ename = $"f{i}.dat";
+                DateTimeOffset dto = GenerateDTO(rnd, timeMin, timeMax);
 
                 Console.Write($"{ename}: {genEvent}, size = {size}");
 
                 if (genEvent != GenEvent.New)
                 {
-                    using (var e = ar1.CreateEntry(ename, CompressionLevel.NoCompression).Open())
+                    var entry = ar1.CreateEntry(ename, CompressionLevel.NoCompression);
+                    entry.LastWriteTime = dto;
+                    using (var e = entry.Open())
                     {
                         e.Write(s);
                     }
+                    
                 }
 
                 if (genEvent != GenEvent.Del)
@@ -89,6 +101,7 @@ class Program
                     if (genEvent == GenEvent.ModSame)
                     {
                         rnd.NextBytes(s);
+                        dto = dto.AddSeconds(1 * 60 * 60);
                     }
                     else if (genEvent == GenEvent.ModDiff)
                     {
@@ -96,9 +109,12 @@ class Program
                         s = new Span<byte>(buffer, 0, sizeV2);
                         rnd.NextBytes(s);
                         Console.Write($", sizeV2 = {sizeV2}");
+                        dto = dto.AddSeconds(2 * 60 * 60);
                     }
 
-                    using (var e = ar2.CreateEntry(ename, CompressionLevel.NoCompression).Open())
+                    var entry = ar2.CreateEntry(ename, CompressionLevel.NoCompression);
+                    entry.LastWriteTime = dto;
+                    using (var e = entry.Open())
                     {
                         e.Write(s);
                     }
@@ -107,6 +123,10 @@ class Program
                 Console.WriteLine();
             }
         }
+        
+        File.SetLastWriteTime(pathV1, DateTimeOffset.FromUnixTimeSeconds(timeMax).DateTime);
+        File.SetLastWriteTime(pathV2, DateTimeOffset.FromUnixTimeSeconds(timeMax + 86000).DateTime);
+
         Console.WriteLine();
     }
 
