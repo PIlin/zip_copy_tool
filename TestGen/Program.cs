@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.IO.Hashing;
 using System.Text;
@@ -7,6 +8,9 @@ namespace TestGen;
 class Program
 {
     enum GenEvent { New, Del, ModSame, ModDiff, Keep };
+
+    static Stopwatch s_bufGenTime = new Stopwatch();
+    static long s_bufGenSize = 0;
 
     static int GetStringHash(string s)
     {
@@ -23,6 +27,81 @@ class Program
         DateTimeOffset dto = DateTimeOffset.FromUnixTimeSeconds(modtime);
         return dto;
     }
+
+
+    static UInt64 xorshift64(UInt64 x)
+    {
+        /* see https://en.wikipedia.org/wiki/Xorshift
+        struct xorshift64_state
+        {
+            uint64_t a;
+        };
+        uint64_t xorshift64(struct xorshift64_state *state)
+        {
+            uint64_t x = state->a;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            return state->a = x;
+        }
+        */
+
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        return x;
+    }
+
+    static void GenerateBufferXorshift(UInt64 state, Span<byte> buffer)
+    {
+        int alignedLen = (buffer.Length / 8) * 8;
+        Span<byte> bufAligned = buffer.Slice(0, alignedLen);
+        Span<byte> bufTail = buffer.Slice(alignedLen);
+
+        for (int offset = 0; offset < bufAligned.Length; offset += 8)
+        {
+            UInt64 x = xorshift64(state);
+            bufAligned[offset + 0] = (byte)(x & 0xFF);
+            bufAligned[offset + 1] = (byte)((x >> 8) & 0xFF);
+            bufAligned[offset + 2] = (byte)((x >> 16) & 0xFF);
+            bufAligned[offset + 3] = (byte)((x >> 24) & 0xFF);
+            bufAligned[offset + 4] = (byte)((x >> 32) & 0xFF);
+            bufAligned[offset + 5] = (byte)((x >> 40) & 0xFF);
+            bufAligned[offset + 6] = (byte)((x >> 48) & 0xFF);
+            bufAligned[offset + 7] = (byte)((x >> 56) & 0xFF);
+
+            state = x;
+        }
+
+
+        if (bufTail.Length > 0)
+        {
+            UInt64 x = xorshift64(state);
+
+            for (int offset = 0; offset < bufTail.Length; offset++)
+            {
+                int shift = 8 * (offset % 8);
+                bufTail[offset] = (byte)((x >> shift) & 0xFF);
+            }
+        }
+    }
+
+    static void GenerateBuffer(Random rnd, Span<byte> buffer)
+    {
+        s_bufGenTime.Start();
+
+#if false
+        // very slow, around ~180 MB/s
+        rnd.NextBytes(buffer);
+#else
+        // does ~3 GB/s
+        GenerateBufferXorshift((ulong)rnd.NextInt64(), buffer);
+#endif
+
+        s_bufGenTime.Stop();
+        s_bufGenSize += buffer.Length;
+    }
+
 
     static void GenerateFile(string pathV1, string pathV2, string filename)
     {
@@ -79,7 +158,7 @@ class Program
 
                 int size = rnd.Next(sizeMin, sizeMax);
                 var s = new Span<byte>(buffer, 0, size);
-                rnd.NextBytes(s);
+                GenerateBuffer(rnd, s);
                 string ename = $"f{i}.dat";
                 DateTimeOffset dto = GenerateDTO(rnd, timeMin, timeMax);
 
@@ -100,14 +179,14 @@ class Program
                 {
                     if (genEvent == GenEvent.ModSame)
                     {
-                        rnd.NextBytes(s);
+                        GenerateBuffer(rnd, s);
                         dto = dto.AddSeconds(1 * 60 * 60);
                     }
                     else if (genEvent == GenEvent.ModDiff)
                     {
                         int sizeV2 = rnd.Next(sizeMin, sizeMax);
                         s = new Span<byte>(buffer, 0, sizeV2);
-                        rnd.NextBytes(s);
+                        GenerateBuffer(rnd, s);
                         Console.Write($", sizeV2 = {sizeV2}");
                         dto = dto.AddSeconds(2 * 60 * 60);
                     }
@@ -138,6 +217,8 @@ class Program
             return;
         }
 
+        Stopwatch sw = Stopwatch.StartNew();
+
         string v1 = args[0];
         string v2 = args[1];
 
@@ -149,5 +230,9 @@ class Program
             string filename = args[i];
             GenerateFile(v1, v2, filename);
         }
+
+        sw.Stop();
+
+        Console.WriteLine($"Time {sw.Elapsed}, gen time {s_bufGenTime.Elapsed}, gen rate { (s_bufGenSize / s_bufGenTime.Elapsed.TotalSeconds) / 1024.0f / 1024.0f }");
     }
 }
