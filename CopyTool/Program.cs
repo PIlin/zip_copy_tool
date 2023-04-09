@@ -212,11 +212,10 @@ namespace CopyTool
 
 					if (req.dstPathType != EPathType.None)
 					{
-
 						if (m_settings.copyZipFuzzy)
 						{
 							logger.Info("Replicate zip {0} to {1} with fuzzy update", req.srcPath, req.dstPath);
-							PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(req.srcPath, req.dstPath);
+							await PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(req.srcPath, req.dstPath);
 						}
 						else
 						{

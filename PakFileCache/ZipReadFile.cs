@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace PakFileCache
 {
@@ -426,17 +427,34 @@ namespace PakFileCache
 		public CDR CDR { get; }
 		public long CDROffset { get; }
 		public Stream Stream { get; }
-		
+
+		public static async Task<ZipReadFile> OpenAsync(Stream stream)
+		{
+            CDRLoadResult cdr = await LoadCDR(stream);
+			return new ZipReadFile(stream, cdr.cdr, cdr.cdrOffset);
+        }
 
 		public ZipReadFile(Stream stream)
 		{
 			Stream = stream;
-			long cdrOffset;
-			CDR = LoadCDR(stream, out cdrOffset);
+            CDRLoadResult cdr = LoadCDR(stream).Result;
+			CDR = cdr.cdr;
+			CDROffset = cdr.cdrOffset;
+		}
+
+		private ZipReadFile(Stream stream, CDR cdr, long cdrOffset)
+		{
+			Stream = stream;
+			CDR = cdr;
 			CDROffset = cdrOffset;
 		}
 
-		static CDR LoadCDR(Stream bs, out long outCdrOffset)
+		class CDRLoadResult
+		{
+			public CDR cdr;
+			public long cdrOffset;
+		}
+		static async Task<CDRLoadResult> LoadCDR(Stream bs)
 		{
 			bool debugLog = false;
 
@@ -444,10 +462,11 @@ namespace PakFileCache
 			long fileSize = bs.Length;
 			if (debugLog) logger.Info($"File size {fileSize}");
 
-			long commentStart;
-			byte[] comment;
-			CDREnd fileCDREnd = FindCDREnd(bs, out commentStart, out comment);
-			if (debugLog)
+            CDREndResult cdrEndResult = await FindCDREnd(bs);
+			CDREnd fileCDREnd = cdrEndResult.cdrEnd;
+            long commentStart = cdrEndResult.commentStart;
+            byte[] comment = cdrEndResult.comment;
+            if (debugLog)
 			{
 				logger.Info("CDREnd {0:x} - {1:x} ({2:x})", commentStart - CDREnd.SIZE, commentStart, CDREnd.SIZE);
 				logger.Info("  .signature          {0:x}", fileCDREnd.signature);
@@ -470,7 +489,9 @@ namespace PakFileCache
 
 				if (debugLog) logger.Info("CDR {0:x} - {1:x} ({2:x})", cdrPos, cdrPosEnd, cdrPosEnd - cdrPos);
 
-				using (BinaryReader br = new BinaryReader(bs, Encoding.ASCII, true))
+                byte[] buffer = await StreamUtil.ReadBufferAsync(bs, null, (int)fileCDREnd.cdrSize);
+				using (MemoryStream ms = new MemoryStream(buffer))
+				using (BinaryReader br = new BinaryReader(ms, Encoding.ASCII, true))
 				{
 					for (ushort fileIndex = 0; fileIndex < fileCDREnd.numEntriesTotal; fileIndex++)
 					{
@@ -504,12 +525,22 @@ namespace PakFileCache
 					}
 				}
 			}
+			
 
-			outCdrOffset = fileCDREnd.cdrOffset;
-			return new CDR(cdr, comment);
+			return new CDRLoadResult()
+			{
+				cdr = new CDR(cdr, comment),
+				cdrOffset = fileCDREnd.cdrOffset
+			};
 		}
 
-		static CDREnd FindCDREnd(Stream stream, out long commentStart, out byte[] comment)
+		class CDREndResult
+		{
+			public CDREnd cdrEnd;
+			public long commentStart;
+			public byte[] comment;
+		}
+		static async Task<CDREndResult> FindCDREnd(Stream stream/*, out long commentStart, out byte[] comment*/)
 		{
 			stream.Seek(0, SeekOrigin.End);
 			long fileSize = stream.Position;
@@ -518,7 +549,8 @@ namespace PakFileCache
 				throw new FileFormatException("File isn't big enough to contain a CDREnd structure");
 			}
 
-			CDREnd cdrEnd = null;
+            CDREndResult result = new CDREndResult();
+            //CDREnd cdrEnd = null;
 
 			// Check to see if this is ZIP file with no archive comment (the
 			// "end of central directory" structure should be the last item in the
@@ -526,11 +558,11 @@ namespace PakFileCache
             stream.Seek(-CDREnd.SIZE, SeekOrigin.End);
 			using (BinaryReader br = new BinaryReader(stream, Encoding.ASCII, true))
 			{
-				cdrEnd = CheckCDREnd(br, 0, out commentStart);
-				if (cdrEnd != null)
+				result.cdrEnd = CheckCDREnd(br, 0, out result.commentStart);
+				if (result.cdrEnd != null)
 				{
-					comment = null;
-					return cdrEnd;
+					result.comment = null;
+					return result;
 				}
 			}
 
@@ -542,41 +574,48 @@ namespace PakFileCache
 
 			long maxCdrEndOffset = Math.Max(fileSize - (1 << 16) - CDREnd.SIZE, 0);
 			stream.Seek(maxCdrEndOffset, SeekOrigin.Begin);
-			byte[] buffer = new byte[fileSize - maxCdrEndOffset];
-			if (stream.Read(buffer, 0, buffer.Length) != buffer.Length)
-			{
-				throw new FileFormatException("Unable to read possible CDREnd buffer with comment");
-			}
 
-			// Since comment size has to be > 0, search span can be reduced
-			var bufSpan = buffer.AsSpan().Slice(0, buffer.Length - (int)CDREnd.SIZE);
-			if (bufSpan.Length > 0)
+			//         byte[] buffer = new byte[fileSize - maxCdrEndOffset];
+
+			//if (await stream.ReadAsync(buffer, 0, buffer.Length) != buffer.Length)
+			//{
+			//	throw new FileFormatException("Unable to read possible CDREnd buffer with comment");
+			//}
+
+			byte[] buffer = await StreamUtil.ReadBufferAsync(stream, null, (int)(fileSize - maxCdrEndOffset));
+
+			return SearchBuffer(buffer, result, maxCdrEndOffset);
+			static CDREndResult SearchBuffer(byte[] buffer, CDREndResult result, long maxCdrEndOffset)
 			{
-				int pos = bufSpan.LastIndexOf(CDREnd.SignatureBytes);
-				if (pos != -1)
+				// Since comment size has to be > 0, search span can be reduced
+				Span<byte> bufSpan = buffer.AsSpan().Slice(0, buffer.Length - (int)CDREnd.SIZE);
+				if (bufSpan.Length > 0)
 				{
-					int sizeLeft = buffer.Length - pos;
-					
-					using (MemoryStream ms = new MemoryStream(buffer, pos, sizeLeft))
-					using (BinaryReader br = new BinaryReader(ms))
+					int pos = bufSpan.LastIndexOf(CDREnd.SignatureBytes);
+					if (pos != -1)
 					{
-						int commentSize = sizeLeft - (int)CDREnd.SIZE;
-						Debug.Assert(commentSize > 0);
+						int sizeLeft = buffer.Length - pos;
 
-						ushort expectedCommentSize = (ushort)commentSize;
-                        cdrEnd = CheckCDREnd(br, expectedCommentSize, out commentStart);
-						if (cdrEnd != null)
+						using (MemoryStream ms = new MemoryStream(buffer, pos, sizeLeft))
+						using (BinaryReader br = new BinaryReader(ms))
 						{
-							commentStart += pos;
-							comment = buffer.AsSpan((int)commentStart).ToArray();
-                            commentStart += maxCdrEndOffset;
-							return cdrEnd;
+							int commentSize = sizeLeft - (int)CDREnd.SIZE;
+							Debug.Assert(commentSize > 0);
+
+							ushort expectedCommentSize = (ushort)commentSize;
+							result.cdrEnd = CheckCDREnd(br, expectedCommentSize, out result.commentStart);
+							if (result.cdrEnd != null)
+							{
+								result.commentStart += pos;
+								result.comment = buffer.AsSpan((int)result.commentStart).ToArray();
+								result.commentStart += maxCdrEndOffset;
+								return result;
+							}
 						}
 					}
 				}
+                throw new FileFormatException("Couldn't find a CDREnd structure");
             }
-
-			throw new FileFormatException("Couldn't find a CDREnd structure");
 		}
 
 		static CDREnd CheckCDREnd(BinaryReader br, ushort expectedCommentSize, out long commentStart)

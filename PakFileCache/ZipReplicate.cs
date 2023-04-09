@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace PakFileCache
 {
@@ -85,23 +88,31 @@ namespace PakFileCache
 		/// <summary>
 		/// Update in-place with fuzzy zip structure
 		/// </summary>
-		public static void ReplicateUpdateFuzzy(string src, string dst)
+		public static async Task ReplicateUpdateFuzzy(string src, string dst)
 		{
             logger.Info("Processing {0} to update from {1}", dst, src);
             Stopwatch startTime = Stopwatch.StartNew();
             DateTime zipMtime;
-            using (MeasuringStream fsrc = new MeasuringStream(new FileStream(src, FileMode.Open, FileAccess.Read), StreamPurpose.Source))
-            using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, FileMode.Open, FileAccess.ReadWrite), StreamPurpose.Target))
+
+            FileStreamOptions readOpts = StreamUtil.MakeReadAsyncOpts();
+            FileStreamOptions writeOpts = StreamUtil.MakeWriteAsyncOpts(FileMode.Open, access: FileAccess.ReadWrite);
+
+            using (MeasuringStream fsrc = new MeasuringStream(new FileStream(src, readOpts), StreamPurpose.Source))
+            using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, writeOpts), StreamPurpose.Target))
             {
                 using (BufferedStream fbsrc = new BufferedStream(fsrc))
                 using (BufferedStream fbdst = new BufferedStream(fdst))
                 {
                     zipMtime = File.GetLastWriteTime(src);
-                    ZipReadFile zsrc = new ZipReadFile(fbsrc);
-                    ZipReadFile zdst = new ZipReadFile(fbdst);
+
+					var zsrcTask = ZipReadFile.OpenAsync(fbsrc);
+					var zdstTask = ZipReadFile.OpenAsync(fbdst);
+
+                    ZipReadFile zsrc = await zsrcTask;
+					ZipReadFile zdst = await zdstTask;
                     logger.Info("Replicating {0}", src);
                     Stopwatch startRepTime = Stopwatch.StartNew();
-                    ReplicateFuzzy(zsrc, zdst, fbdst);
+                    await ReplicateFuzzy(zsrc, zdst, fbdst);
                     startRepTime.Stop();
                     logger.Info("Replication {0} done in {1}", dst, startRepTime.Elapsed);
                 }
@@ -398,7 +409,7 @@ namespace PakFileCache
             }
         }
 
-		public static void ReplicateFuzzy(ZipReadFile zsrc, ZipReadFile zdst, Stream fsOut)
+		public static async Task ReplicateFuzzy(ZipReadFile zsrc, ZipReadFile zdst, Stream fsOut)
         {
 			var zsrcEntries = zsrc.CDR.Entries;
             zsrcEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
@@ -487,21 +498,21 @@ namespace PakFileCache
 				segments.FillHole(ihole, hole, seg);
 
 				srcStream.Seek(srcRec.localHeaderOffset, SeekOrigin.Begin);
-				StreamUtil.FillBuffer(srcStream, localHeaderBuf, localHeaderBuf.Length);
+				await StreamUtil.FillBufferAsync(srcStream, localHeaderBuf, localHeaderBuf.Length);
 
 				LocalFileHeader lfh = new LocalFileHeader(localHeaderBuf);
 				if (!lfh.Check(srcRec, HackIgnoreLFHVersionNeeded))
 					throw new FileFormatException($"LocalFileHeader failed check. File {srcRec.FileName}");
 
-				fileNameBuf = StreamUtil.ReadBuffer(srcStream, fileNameBuf, lfh.fileNameSize);
+				fileNameBuf = await StreamUtil.ReadBufferAsync(srcStream, fileNameBuf, lfh.fileNameSize);
 				if (!CompareFilenameBuffer(fileNameBuf, lfh.fileNameSize, srcRec))
 					throw new FileFormatException($"LocalFileHeader filename differs from filename in CDR. File {srcRec.FileName}");
 
 				fsOut.Seek(seg.start, SeekOrigin.Begin);
-				fsOut.Write(localHeaderBuf, 0, localHeaderBuf.Length);
-				fsOut.Write(fileNameBuf, 0, lfh.fileNameSize);
+				await fsOut.WriteAsync(localHeaderBuf, 0, localHeaderBuf.Length);
+				await fsOut.WriteAsync(fileNameBuf, 0, lfh.fileNameSize);
 				long size = lfh.extraFieldSize + lfh.desc.sizeCompressed;
-				StreamUtil.CopyNTo(srcStream, fsOut, size);
+				await StreamUtil.CopyNToAsync(srcStream, fsOut, size);
 
 				var dstRec = new CDRFileHeader(srcRec, seg.start);
 				newCdr.Add(dstRec);
@@ -523,25 +534,44 @@ namespace PakFileCache
 			}
 
 			fsOut.Seek(cdrStart, SeekOrigin.Begin);
-			using (BinaryWriter bw = new BinaryWriter(fsOut, Encoding.ASCII, true))
+
+			byte[] cdrBuf = WriteCdrBytes(newCdr, cdrStart, zsrc.CDR.Comment);
+			await fsOut.WriteAsync(cdrBuf);
+            fsOut.SetLength(fsOut.Position);
+        }
+
+		static byte[] WriteCdrBytes(List<CDRFileHeader> newCdr, uint cdrStart, byte[] comment)
+		{
+			int capacity = 0;
+            foreach (var entry in newCdr)
 			{
-				Debug.Assert(fsOut.Position == cdrStart);
-				foreach (var entry in newCdr)
-				{
-					entry.Write(bw);
-				}
-				uint cdrEnd = (uint)fsOut.Position;
+				capacity += (int)entry.CdrRecordSize;
+			}
+			capacity += (int)CDREnd.SIZE;
+			if (comment != null) capacity += comment.Length;
 
-				Debug.Assert(newCdr.Count <= ushort.MaxValue);
-				CDREnd end = new CDREnd(cdrStart, cdrEnd - cdrStart, (ushort)newCdr.Count, zsrc.CDR.Comment);
-				end.Write(bw);
-				if (zsrc.CDR.Comment != null)
-				{
-					bw.Write(zsrc.CDR.Comment);
-				}
+            using (MemoryStream cdrMs = new MemoryStream(capacity))
+            {
+                using (BinaryWriter bw = new BinaryWriter(cdrMs, Encoding.ASCII, true))
+                {
+                    Debug.Assert(cdrMs.Position + cdrStart == cdrStart);
+                    foreach (var entry in newCdr)
+                    {
+                        entry.Write(bw);
+                    }
+                    uint cdrEnd = (uint)cdrMs.Position + cdrStart;
+
+                    Debug.Assert(newCdr.Count <= ushort.MaxValue);
+                    CDREnd end = new CDREnd(cdrStart, cdrEnd - cdrStart, (ushort)newCdr.Count, comment);
+                    end.Write(bw);
+                    if (comment != null)
+                    {
+                        bw.Write(comment);
+                    }
+                }
+
+				return cdrMs.GetBuffer();
             }
-
-			fsOut.SetLength(fsOut.Position);
         }
 
 

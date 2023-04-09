@@ -8,30 +8,75 @@ namespace PakFileCache
 {
     public static class StreamUtil
 	{
-		public static void FillBuffer(Stream stream, byte[] buffer, int numBytes)
+		public static FileStreamOptions MakeReadAsyncOpts()
+		{
+			return new FileStreamOptions()
+			{
+				Mode = FileMode.Open,
+				Access = FileAccess.Read,
+				Options = FileOptions.Asynchronous
+			};
+		}
+		public static FileStreamOptions MakeWriteAsyncOpts(FileMode mode, FileAccess access = FileAccess.Write, long preallocationSize = 0)
+		{
+			return new FileStreamOptions()
+			{
+				Mode = mode,
+				Access = access,
+				Options = FileOptions.Asynchronous,
+				PreallocationSize = preallocationSize
+			};
+		}
+
+        public static void FillBuffer(Stream stream, byte[] buffer, int numBytes)
 		{
 			int read = 0;
-			do
-			{
+            while (read < numBytes)
+            {
 				int n = stream.Read(buffer, read, numBytes - read);
 				if (n == 0)
 				{
 					throw new EndOfStreamException();
 				}
 				read += n;
-			} while (read < numBytes);
+			}
 		}
 
-		public static byte[] ReadBuffer(Stream stream, byte[] buffer, int numBytes)
+        public static async Task FillBufferAsync(Stream stream, byte[] buffer, int numBytes)
+        {
+            int read = 0;
+            while (read < numBytes)
+            {
+                int n = await stream.ReadAsync(buffer, read, numBytes - read);
+                if (n == 0)
+                {
+                    throw new EndOfStreamException();
+                }
+                read += n;
+            }
+        }
+
+        public static byte[] ReadBuffer(Stream stream, byte[] buffer, int numBytes)
 		{
 			if (numBytes == 0) return buffer;
-			if (buffer?.Length < numBytes)
+			if (buffer == null || buffer.Length < numBytes)
 			{
 				buffer = new byte[numBytes];
 			}
 			FillBuffer(stream, buffer, numBytes);
 			return buffer;
 		}
+
+        public static async Task<byte[]> ReadBufferAsync(Stream stream, byte[] buffer, int numBytes)
+        {
+            if (numBytes == 0) return buffer;
+            if (buffer == null || buffer.Length < numBytes)
+            {
+                buffer = new byte[numBytes];
+            }
+            await FillBufferAsync(stream, buffer, numBytes);
+            return buffer;
+        }
 
         public static void CopyNTo(Stream src, Stream dst, long n)
 		{
@@ -164,7 +209,6 @@ namespace PakFileCache
             }
 			return Task.CompletedTask;
         }
-
     }
 
 }

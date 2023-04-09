@@ -352,12 +352,7 @@ namespace PakFileCache
 
         public async Task CopyFileAsync(string srcFilepath, string dstFilepath)
         {
-            FileStreamOptions readOpts = new FileStreamOptions()
-            {
-                Mode = FileMode.Open,
-                Access = FileAccess.Read,
-                Options = FileOptions.Asynchronous
-            };
+            FileStreamOptions readOpts = StreamUtil.MakeReadAsyncOpts();
             using (MeasuringStream src = new MeasuringStream(new FileStream(srcFilepath, readOpts), StreamPurpose.Source))
             {
                 FileStats stats = FileCacheUtil.GetFileStats(src, srcFilepath);
@@ -370,13 +365,7 @@ namespace PakFileCache
                 }
                 else
                 {
-                    FileStreamOptions writeOpts = new FileStreamOptions()
-                    {
-                        Mode = FileMode.Create,
-                        Access = FileAccess.Write,
-                        PreallocationSize = stats.Size,
-                        Options = FileOptions.Asynchronous
-                    };
+                    FileStreamOptions writeOpts = StreamUtil.MakeWriteAsyncOpts(FileMode.Create, preallocationSize: stats.Size);
                     using (MeasuringStream dst = new MeasuringStream(new FileStream(dstFilepath, writeOpts), StreamPurpose.Target))
                     {
                         await StreamUtil.CopyNToAsync(src, dst, stats.Size);
