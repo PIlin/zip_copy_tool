@@ -44,6 +44,15 @@ namespace PakFileCache
 #endif
         }
 
+        public static Task CopyNToAsync(Stream src, Stream dst, long n)
+        {
+#if false
+			return CopyNToAsyncSimple(src, dst, n);
+#elif true
+            return CopyNToAsyncParallel(src, dst, n);
+#endif
+        }
+
 
         private static void CopyNToSync(Stream src, Stream dst, long n)
 		{

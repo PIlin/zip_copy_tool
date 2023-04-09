@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace PakFileCache
 {
@@ -342,6 +344,42 @@ namespace PakFileCache
                     using (MeasuringStream dst = new MeasuringStream(new FileStream(dstFilepath, FileMode.OpenOrCreate, FileAccess.Write), StreamPurpose.Target))
                     {
                         StreamUtil.CopyNTo(src, dst, stats.Size);
+                    }
+                    File.SetLastWriteTime(dstFilepath, stats.MTime);
+                }
+            }
+        }
+
+        public async Task CopyFileAsync(string srcFilepath, string dstFilepath)
+        {
+            FileStreamOptions readOpts = new FileStreamOptions()
+            {
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Options = FileOptions.Asynchronous
+            };
+            using (MeasuringStream src = new MeasuringStream(new FileStream(srcFilepath, readOpts), StreamPurpose.Source))
+            {
+                FileStats stats = FileCacheUtil.GetFileStats(src, srcFilepath);
+
+                if (IsFileAllowedForCache(srcFilepath, stats))
+                {
+                    //CacheObject co = Add(src, srcFilepath, stats, DefaultCacheIdGenerator);
+                    //co.CopyToFile(dstFilepath);
+                    throw new NotImplementedException("Async cache support is not implemented");
+                }
+                else
+                {
+                    FileStreamOptions writeOpts = new FileStreamOptions()
+                    {
+                        Mode = FileMode.Create,
+                        Access = FileAccess.Write,
+                        PreallocationSize = stats.Size,
+                        Options = FileOptions.Asynchronous
+                    };
+                    using (MeasuringStream dst = new MeasuringStream(new FileStream(dstFilepath, writeOpts), StreamPurpose.Target))
+                    {
+                        await StreamUtil.CopyNToAsync(src, dst, stats.Size);
                     }
                     File.SetLastWriteTime(dstFilepath, stats.MTime);
                 }

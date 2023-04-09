@@ -196,7 +196,7 @@ namespace CopyTool
 			public string dstPath;
 			public EPathType dstPathType;
         }
-		void CopyFile(CopyFileRequest req)
+		async Task CopyFile(CopyFileRequest req)
 		{
 			string srcExt = Path.GetExtension(req.srcPath);
 			if (srcExt == ".zip" || srcExt == ".pak")
@@ -235,8 +235,8 @@ namespace CopyTool
 			
 			{
 				logger.Info("Copy {0} to {1}", req.srcPath, req.dstPath);
-				m_fileCache.CopyFile(req.srcPath, req.dstPath);
-			}
+                await m_fileCache.CopyFileAsync(req.srcPath, req.dstPath);
+            }
 		}
 
 		void CopyDir(string srcPath, string dstPath)
