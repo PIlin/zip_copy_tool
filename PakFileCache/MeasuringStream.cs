@@ -86,12 +86,6 @@ namespace PakFileCache
             //return UnderlyingStream.BeginWrite(buffer, offset, count, callback, state);
         }
 
-        public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
-            //return UnderlyingStream.CopyToAsync(destination, bufferSize, cancellationToken);
-        }
-
         public override int EndRead(IAsyncResult asyncResult)
         {
             throw new NotImplementedException();
@@ -103,6 +97,14 @@ namespace PakFileCache
             throw new NotImplementedException();
             //UnderlyingStream.EndWrite(asyncResult);
         }
+
+
+        public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+            //return UnderlyingStream.CopyToAsync(destination, bufferSize, cancellationToken);
+        }
+
 
         public override void Flush()
         {
@@ -124,8 +126,15 @@ namespace PakFileCache
 
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
-            //return UnderlyingStream.ReadAsync(buffer, offset, count, cancellationToken);
+            return ReadAsyncImpl(buffer, offset, count, cancellationToken);
+        }
+
+        private async Task<int> ReadAsyncImpl(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var t = Stopwatch.StartNew();
+            var res = await UnderlyingStream.ReadAsync(buffer, offset, count, cancellationToken);
+            StopAddRead(res, t);
+            return res;
         }
 
         public override int ReadByte()
@@ -155,8 +164,15 @@ namespace PakFileCache
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
-            //return UnderlyingStream.WriteAsync(buffer, offset, count, cancellationToken);
+            return WriteAsyncImpl(buffer, offset, count, cancellationToken);
+        }
+
+        private async Task WriteAsyncImpl(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var t = Stopwatch.StartNew();
+            await UnderlyingStream.WriteAsync(buffer, offset, count, cancellationToken);
+            StopAddWrite(count, t);
+            return;
         }
 
         public override void WriteByte(byte value)

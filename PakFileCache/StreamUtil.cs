@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Buffers;
+using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace PakFileCache
 {
@@ -30,22 +33,129 @@ namespace PakFileCache
 			return buffer;
 		}
 
-		public static void CopyNTo(Stream src, Stream dst, long n)
+        public static void CopyNTo(Stream src, Stream dst, long n)
+		{
+#if false
+			CopyNToSync(src, dst, n);
+#elif false
+			CopyNToAsyncSimple(src, dst, n).Wait();
+#elif true
+            CopyNToAsyncParallel(src, dst, n).Wait();
+#endif
+        }
+
+
+        private static void CopyNToSync(Stream src, Stream dst, long n)
 		{
 			if (n > 0)
 			{
-				const long bufferSize = 64 * 1024;
-				byte[] buffer = new byte[bufferSize];
-				int read;
-				while (n > 0 &&
-					   (read = src.Read(buffer, 0, (int)Math.Min(bufferSize, n))) > 0)
+                // Stream.GetCopyBufferSize() uses this size 81920
+                const int bufferSize = 80 * 1024;
+
+				var pool = ArrayPool<byte>.Shared;
+                byte[] buffer = pool.Rent(bufferSize);
+
+				try
 				{
-					dst.Write(buffer, 0, read);
-					n -= read;
+					int read;
+					while (n > 0 &&
+						   (read = src.Read(buffer, 0, (int)Math.Min(bufferSize, n))) > 0)
+					{
+						dst.Write(buffer, 0, read);
+						n -= read;
+					}
 				}
+				finally
+				{
+					pool.Return(buffer);
+				}
+
 			}
 		}
 
-	}
+        private static Task CopyNToAsyncSimple(Stream src, Stream dst, long n)
+        {
+            if (n > 0)
+            {
+				return CopyImpl(src, dst, n);
+
+                static async Task CopyImpl(Stream src, Stream dst, long n)
+				{
+					// Stream.GetCopyBufferSize() uses this size 81920
+					const int bufferSize = 80 * 1024;
+
+					var pool = ArrayPool<byte>.Shared;
+					byte[] buffer = pool.Rent(bufferSize);
+
+					try
+					{
+						int read;
+						while (n > 0 &&
+							   (read = await src.ReadAsync(buffer, 0, (int)Math.Min(bufferSize, n)).ConfigureAwait(false)) > 0)
+						{
+							await dst.WriteAsync(buffer, 0, read).ConfigureAwait(false);
+							n -= read;
+						}
+					}
+					finally
+					{
+						pool.Return(buffer);
+					}
+				};
+            }
+
+			return Task.CompletedTask;
+        }
+
+        private static Task CopyNToAsyncParallel(Stream src, Stream dst, long n)
+        {
+            if (n > 0)
+            {
+                return CopyImpl(src, dst, n);
+
+                static async Task CopyImpl(Stream src, Stream dst, long n)
+                {
+                    // Stream.GetCopyBufferSize() uses this size 81920
+                    const int bufferSize = 80 * 1024;
+
+                    var pool = ArrayPool<byte>.Shared;
+					byte[] readBuf = pool.Rent(bufferSize);
+					byte[] writeBuf = pool.Rent(bufferSize);
+
+                    try
+                    {
+                        int totalRead = 0;
+                        int totalWritten = 0;
+
+                        Debug.Assert(n > 0);
+
+                        var readTask = src.ReadAsync(readBuf, 0, (int)Math.Min(bufferSize, n)).ConfigureAwait(false);
+                        int read;
+                        while (n > 0 && (read = await readTask) > 0)
+						{
+							n -= read;
+							totalRead += read;
+							(readBuf, writeBuf) = (writeBuf, readBuf);
+
+							// run read and write operation concurrently
+							if (n > 0)
+                                readTask = src.ReadAsync(readBuf, 0, (int)Math.Min(bufferSize, n)).ConfigureAwait(false);
+
+							await dst.WriteAsync(writeBuf, 0, read).ConfigureAwait(false);
+							totalWritten += read;
+                        }
+						Debug.Assert(totalRead == totalWritten);
+                    }
+                    finally
+                    {
+                        pool.Return(readBuf);
+						pool.Return(writeBuf);
+                    }
+                };
+            }
+			return Task.CompletedTask;
+        }
+
+    }
 
 }

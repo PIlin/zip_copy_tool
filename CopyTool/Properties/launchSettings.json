@@ -3,6 +3,18 @@
     "CopyTool": {
       "commandName": "Project",
       "commandLineArgs": "d:\\code\\PakPatcher\\test\\gen_v2  d:\\code\\PakPatcher\\test\\gen_v1"
+    },
+    "CopyTool - dst hdd": {
+      "commandName": "Project",
+      "commandLineArgs": "--par 4 d:\\code\\PakPatcher\\test\\gen_v2  e:\\tmp\\copy_test\\gen_v1"
+    },
+    "CopyTool - src hdd": {
+      "commandName": "Project",
+      "commandLineArgs": "e:\\tmp\\copy_test\\gen_v2  d:\\code\\PakPatcher\\test\\gen_v1"
+    },
+    "CopyTool - src net": {
+      "commandName": "Project",
+      "commandLineArgs": "--par 2 \\\\192.168.178.166\\copy_test\\gen_v2  d:\\code\\PakPatcher\\test\\gen_v1"
     }
   }
 }
