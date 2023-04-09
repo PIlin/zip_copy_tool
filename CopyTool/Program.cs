@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
+using System.Runtime;
 
 namespace CopyTool
 {
@@ -20,6 +21,7 @@ namespace CopyTool
 		{
             public string fileCachePath = "";
 			public bool copyZipFuzzy = true;
+			public int maxParallelelism = 1;
         }
 
         private ActionBlock<CopyFileRequest> m_copyFileBlock;
@@ -103,6 +105,16 @@ namespace CopyTool
                     m_settings.copyZipFuzzy = false;
                     i += 1;
                 }
+				else if (args[i] == "--par")
+				{
+                    if (args[i + 1][0] != '-')
+                    {
+						m_settings.maxParallelelism = Math.Max(int.Parse(args[i + 1]), 1);
+                        i += 2;
+                    }
+                    else
+                        throw new ArgumentException("--par requires number", "par");
+                }
 				else
 				{
 					logger.Warn("Unknown argument {0}: {1}", i, args[i]);
@@ -120,14 +132,23 @@ namespace CopyTool
 
 			InitFileCache(m_settings.fileCachePath);
 
-            m_copyFileBlock = new ActionBlock<CopyFileRequest>(CopyFile);
+			if (m_settings.maxParallelelism > 1)
+			{
+				logger.Info("Using up to {0} parallel copy operations", m_settings.maxParallelelism);
+			}
 
+            m_copyFileBlock = new ActionBlock<CopyFileRequest>(CopyFile, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = m_settings.maxParallelelism });
+
+            logger.Info("Starting copy");
+			Stopwatch sw = Stopwatch.StartNew();
             Copy(srcPath, dstPath);
 
 			m_copyFileBlock.Complete();
 			logger.Info("Awaiting copy completion");
 			m_copyFileBlock.Completion.Wait();
-            logger.Info("Copy completed");
+			sw.Stop();
+
+            logger.Info("Copy completed, elapsed {0}", sw.Elapsed);
 
 
             PakFileCache.StreamStatsMgr.Instance.LogReports();
@@ -139,7 +160,7 @@ namespace CopyTool
 			EPathType cachePathType = CheckPathType(fileCachePath);
 			if (cachePathType == EPathType.File || cachePathType == EPathType.None)
 			{
-				logger.Info($"Invalid file cache path {fileCachePath}, working without cache");
+				logger.Info("Invalid file cache path {0}, working without cache", fileCachePath);
 				m_fileCache = new PakFileCache.FileCache();
 				return;
 			}
