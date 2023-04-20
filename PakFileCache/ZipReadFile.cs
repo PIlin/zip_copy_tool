@@ -411,13 +411,22 @@ namespace PakFileCache
 	public class CDR
 	{
 		public List<CDRFileHeader> Entries { get; private set; }
-		public ILookup<string, CDRFileHeader> Files => Entries.ToLookup(x => x.FileName);
+		public Dictionary<string, CDRFileHeader> Files { get; private set; }
 		public byte[] Comment { get; }
 		public CDR(List<CDRFileHeader> entries, byte[] comment)
 		{
 			Entries = entries;
 			Comment = comment;
-		}
+
+			try
+			{
+				Files = entries.ToDictionary(x => x.FileName);
+			}
+			catch(ArgumentException ex)
+			{
+                throw new FileFormatException($"Source archive has multiple files with the same name", ex);
+            }               
+        }
 	}
 
 	public class ZipReadFile

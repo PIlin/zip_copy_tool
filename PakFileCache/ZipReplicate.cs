@@ -428,16 +428,10 @@ namespace PakFileCache
             List<CDRFileHeader> toUpdateFromSrcCdr = new List<CDRFileHeader>(zsrcEntries.Count);
             foreach (var rec in zdstEntries)
             {
-				var similarFiles = zsrc.CDR.Files[rec.FileName].ToArray();
-				if (similarFiles.Length > 1)
-				{
-					throw new FileFormatException($"Source archive has multiple files with the same name: {rec.FileName}");
-				}
-
-				if (similarFiles.Length > 0)
+				CDRFileHeader srcRec;
+				if (zsrc.CDR.Files.TryGetValue(rec.FileName, out srcRec))
 				{
 					string debugReason;
-					var srcRec = similarFiles[0];
 
 					if (IsSameFile(rec, srcRec, out debugReason))
 					{
@@ -462,7 +456,7 @@ namespace PakFileCache
 			}
 			foreach (var rec in zsrcEntries)
 			{
-                if (zdst.CDR.Files[rec.FileName].Count() == 0)
+                if (!zdst.CDR.Files.ContainsKey(rec.FileName))
 				{
                     toUpdateFromSrcCdr.Add(rec);
 				}
@@ -578,11 +572,13 @@ namespace PakFileCache
         static CDRFileHeader FindSameFile(CDRFileHeader query, CDR cdr, out string debugReason)
 		{
 			debugReason = "not found";
-			foreach (CDRFileHeader src in cdr.Files[query.FileName])
+			CDRFileHeader src;
+			if (cdr.Files.TryGetValue(query.FileName, out src)) 
 			{
-				if (!IsSameFile(src, query, out debugReason))
-					continue;
-				return src;
+				if (IsSameFile(src, query, out debugReason))
+				{
+					return src;
+				}
 			}
 
 			return null;
