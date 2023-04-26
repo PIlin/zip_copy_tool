@@ -11,22 +11,22 @@ using System.Runtime;
 
 namespace CopyTool
 {
-    class Program
-    {
+	class Program
+	{
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
 		private static char[] s_dirSeparators = new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
 
 		class Settings
 		{
-            public string fileCachePath = "";
+			public string fileCachePath = "";
 			public bool copyZipFuzzy = true;
 			public int maxParallelelism = 1;
-        }
+		}
 
-        private ActionBlock<CopyFileRequest> m_copyFileBlock;
+		private ActionBlock<CopyFileRequest> m_copyFileBlock;
 
-        Settings m_settings = new Settings();
+		Settings m_settings = new Settings();
 		PakFileCache.FileCache m_fileCache;
 
 		static void InitLog()
@@ -35,18 +35,18 @@ namespace CopyTool
 			var layout = new NLog.Layouts.SimpleLayout("${longdate}|${threadid}|${level:uppercase=true}|${logger}|${message} ${exception:format=tostring}");
 			var logfile = new NLog.Targets.FileTarget("logfile") { FileName = "log.txt", Layout = layout };
 			var logconsole = new NLog.Targets.ConsoleTarget("logconsole") { Layout = layout };
-			
+
 			config.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, new NLog.Targets.Wrappers.AsyncTargetWrapper(logconsole));
 			config.AddRule(NLog.LogLevel.Debug, NLog.LogLevel.Fatal, new NLog.Targets.Wrappers.AsyncTargetWrapper(logfile));
 			NLog.LogManager.Configuration = config;
 		}
 
 		enum EPathType
-        {
+		{
 			None,
 			File,
 			Dir
-        };
+		};
 
 		static EPathType CheckPathType(string path)
 		{
@@ -63,7 +63,7 @@ namespace CopyTool
 		}
 
 		static void Main(string[] args)
-        {
+		{
 			try
 			{
 				InitLog();
@@ -77,7 +77,7 @@ namespace CopyTool
 			}
 
 			NLog.LogManager.Flush();
-        }
+		}
 
 
 		void Exec(string[] args)
@@ -100,27 +100,27 @@ namespace CopyTool
 					m_settings.copyZipFuzzy = true;
 					i += 1;
 				}
-                else if (args[i] == "--no-fuzzy")
-                {
-                    m_settings.copyZipFuzzy = false;
-                    i += 1;
-                }
+				else if (args[i] == "--no-fuzzy")
+				{
+					m_settings.copyZipFuzzy = false;
+					i += 1;
+				}
 				else if (args[i] == "--par")
 				{
-                    if (args[i + 1][0] != '-')
-                    {
+					if (args[i + 1][0] != '-')
+					{
 						m_settings.maxParallelelism = Math.Max(int.Parse(args[i + 1]), 1);
-                        i += 2;
-                    }
-                    else
-                        throw new ArgumentException("--par requires number", "par");
-                }
+						i += 2;
+					}
+					else
+						throw new ArgumentException("--par requires number", "par");
+				}
 				else
 				{
 					logger.Warn("Unknown argument {0}: {1}", i, args[i]);
 					i++;
 				}
-            }
+			}
 
 			if (args.Length < i + 2)
 			{
@@ -137,23 +137,23 @@ namespace CopyTool
 				logger.Info("Using up to {0} parallel copy operations", m_settings.maxParallelelism);
 			}
 
-            m_copyFileBlock = new ActionBlock<CopyFileRequest>(CopyFile, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = m_settings.maxParallelelism });
+			m_copyFileBlock = new ActionBlock<CopyFileRequest>(CopyFile, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = m_settings.maxParallelelism });
 
-            logger.Info("Starting copy");
+			logger.Info("Starting copy");
 			Stopwatch sw = Stopwatch.StartNew();
-            Copy(srcPath, dstPath);
+			Copy(srcPath, dstPath);
 
 			m_copyFileBlock.Complete();
 			logger.Info("Awaiting copy completion");
 			m_copyFileBlock.Completion.Wait();
 			sw.Stop();
 
-            logger.Info("Copy completed, elapsed {0}", sw.Elapsed);
+			logger.Info("Copy completed, elapsed {0}", sw.Elapsed);
 
 
-            PakFileCache.StreamStatsMgr.Instance.LogReports();
-            PakFileCache.StreamStatsMgr.Instance.Reset();
-        }
+			PakFileCache.StreamStatsMgr.Instance.LogReports();
+			PakFileCache.StreamStatsMgr.Instance.Reset();
+		}
 
 		void InitFileCache(string fileCachePath)
 		{
@@ -195,7 +195,7 @@ namespace CopyTool
 			public string srcPath;
 			public string dstPath;
 			public EPathType dstPathType;
-        }
+		}
 		async Task CopyFile(CopyFileRequest req)
 		{
 			string srcExt = Path.GetExtension(req.srcPath);
@@ -205,10 +205,10 @@ namespace CopyTool
 				{
 					if (m_fileCache.Enabled)
 					{
-                        logger.Info("Replicate zip {0} to {1}", req.srcPath, req.dstPath);
-                        PakFileCache.ZipReplicate.ReplicateZipFileWithCache(req.srcPath, req.dstPath, m_fileCache);
+						logger.Info("Replicate zip {0} to {1}", req.srcPath, req.dstPath);
+						PakFileCache.ZipReplicate.ReplicateZipFileWithCache(req.srcPath, req.dstPath, m_fileCache);
 						return;
-                    }
+					}
 
 					if (req.dstPathType != EPathType.None)
 					{
@@ -231,11 +231,11 @@ namespace CopyTool
 					logger.Warn(e, "Failed to replicate zip file, retry as normal file copy");
 				}
 			}
-			
+
 			{
 				logger.Info("Copy {0} to {1}", req.srcPath, req.dstPath);
-                await m_fileCache.CopyFileAsync(req.srcPath, req.dstPath);
-            }
+				await m_fileCache.CopyFileAsync(req.srcPath, req.dstPath);
+			}
 		}
 
 		void CopyDir(string srcPath, string dstPath)
@@ -245,7 +245,7 @@ namespace CopyTool
 			List<string> dstFiles = new List<string>();
 			HashSet<string> dstDirs = new HashSet<string>();
 
-            foreach (string srcFilepath in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
+			foreach (string srcFilepath in Directory.EnumerateFiles(srcPath, "*", SearchOption.AllDirectories))
 			{
 				string srcDir = Path.GetDirectoryName(srcFilepath);
 				if (srcDir.StartsWith(srcPath))
@@ -260,24 +260,24 @@ namespace CopyTool
 
 				}
 				else
-                {
+				{
 					logger.Warn("Unable to retrieve path of file {0} relative to {1}", srcFilepath, srcPath);
 				}
 			}
 
 			Debug.Assert(srcFiles.Count == dstFiles.Count);
-            logger.Info("Found {0} files", srcFiles.Count);
+			logger.Info("Found {0} files", srcFiles.Count);
 
 			foreach (string dir in dstDirs)
 			{
-                Directory.CreateDirectory(dir);
-            }
+				Directory.CreateDirectory(dir);
+			}
 
 			for (int i = 0; i < srcFiles.Count; ++i)
 			{
 				Copy(srcFiles[i], dstFiles[i]);
 			}
-        }
+		}
 
 	}
 }

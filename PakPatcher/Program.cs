@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace PakPatcher
 {
-    class Program
+	class Program
 	{
 		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -39,18 +39,18 @@ namespace PakPatcher
 			ReplicateZipFileWithCache(@"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v2_out.zip", fc);
 		}
 
-        static void TestZipReplicate()
+		static void TestZipReplicate()
 		{
-            PakFileCache.ZipReplicate.ReplicateUpdate(@"d:\code\PakPatcher\test\v1.zip", @"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v1_2.zip");
-            PakFileCache.StreamStatsMgr.Instance.LogReports();
-            PakFileCache.StreamStatsMgr.Instance.Reset();
-        }
+			PakFileCache.ZipReplicate.ReplicateUpdate(@"d:\code\PakPatcher\test\v1.zip", @"d:\code\PakPatcher\test\v2.zip", @"d:\code\PakPatcher\test\v1_2.zip");
+			PakFileCache.StreamStatsMgr.Instance.LogReports();
+			PakFileCache.StreamStatsMgr.Instance.Reset();
+		}
 
-        static void TestZipReplicateFuzzy()
-        {
+		static void TestZipReplicateFuzzy()
+		{
 			string v1 = @"d:\code\PakPatcher\test\v1.zip";
 			string v2 = @"d:\code\PakPatcher\test\v2.zip";
-            string dst = @"d:\code\PakPatcher\test\v1_2.zip";
+			string dst = @"d:\code\PakPatcher\test\v1_2.zip";
 			try
 			{
 				File.Delete(dst);
@@ -58,20 +58,20 @@ namespace PakPatcher
 			catch { }
 			File.Copy(v1, dst);
 
-            PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(v2, dst);
-            PakFileCache.StreamStatsMgr.Instance.LogReports();
-            PakFileCache.StreamStatsMgr.Instance.Reset();
-        }
+			PakFileCache.ZipReplicate.ReplicateUpdateFuzzy(v2, dst);
+			PakFileCache.StreamStatsMgr.Instance.LogReports();
+			PakFileCache.StreamStatsMgr.Instance.Reset();
+		}
 
-        static void Main(string[] args)
-        {
+		static void Main(string[] args)
+		{
 			InitLog();
 
 			//TestZipReplicate();
 			TestZipReplicateFuzzy();
 
-            //TestCacheCopy();
-            //TestZipCacheReplicate();
-        }
-    }
+			//TestCacheCopy();
+			//TestZipCacheReplicate();
+		}
+	}
 }

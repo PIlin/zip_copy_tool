@@ -12,10 +12,10 @@ using System.Threading.Tasks;
 namespace PakFileCache
 {
 	public static class ZipReplicate
-    {
-        private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-        public const bool HackIgnoreLFHVersionNeeded = true;
-        public const bool HackIgnoreInconsistentFilenameSeparator = true;
+	{
+		private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+		public const bool HackIgnoreLFHVersionNeeded = true;
+		public const bool HackIgnoreInconsistentFilenameSeparator = true;
 
 		public static void ReplicateZipFileWithCache(string src, string dst, FileCache fc)
 		{
@@ -42,92 +42,92 @@ namespace PakFileCache
 			logger.Info("Processing {0} done in {1}", src, startTime.Elapsed);
 		}
 
-        public static void ReplicateUpdate(string srcV1, string srcV2, string dst)
-        {
+		public static void ReplicateUpdate(string srcV1, string srcV2, string dst)
+		{
 			string dstWork = dst;
 			if (dst == srcV1 || dst == srcV2)
 			{
 				dstWork = dst + ".new";
-                logger.Info("Processing {0} and {1} to produce {2} (writing to temporary {3})", srcV1, srcV2, dst, dstWork);
-            }
+				logger.Info("Processing {0} and {1} to produce {2} (writing to temporary {3})", srcV1, srcV2, dst, dstWork);
+			}
 			else
 			{
-                logger.Info("Processing {0} and {1} to produce {2}", srcV1, srcV2, dst);
-            }
-            
-            Stopwatch startTime = Stopwatch.StartNew();
-            DateTime zipMtime;
-            using (MeasuringStream fv1 = new MeasuringStream(new FileStream(srcV1, FileMode.Open), StreamPurpose.Source))
-            using (MeasuringStream fv2 = new MeasuringStream(new FileStream(srcV2, FileMode.Open), StreamPurpose.Source))
-            using (MeasuringStream fdst = new MeasuringStream(new FileStream(dstWork, FileMode.Create), StreamPurpose.Target))
-            {
-                using (BufferedStream fbv1 = new BufferedStream(fv1))
-                using (BufferedStream fbv2 = new BufferedStream(fv2))
-                {
-                    zipMtime = File.GetLastWriteTime(srcV2);
-                    ZipReadFile z1 = new ZipReadFile(fbv1);
-                    ZipReadFile z2 = new ZipReadFile(fbv2);
-                    Stopwatch startRepTime = Stopwatch.StartNew();
-                    Replicate(z1, z2, fdst);
-                    startRepTime.Stop();
-                    logger.Info("Replication done in {0}", startRepTime.Elapsed);
-                }
-            }
+				logger.Info("Processing {0} and {1} to produce {2}", srcV1, srcV2, dst);
+			}
+
+			Stopwatch startTime = Stopwatch.StartNew();
+			DateTime zipMtime;
+			using (MeasuringStream fv1 = new MeasuringStream(new FileStream(srcV1, FileMode.Open), StreamPurpose.Source))
+			using (MeasuringStream fv2 = new MeasuringStream(new FileStream(srcV2, FileMode.Open), StreamPurpose.Source))
+			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dstWork, FileMode.Create), StreamPurpose.Target))
+			{
+				using (BufferedStream fbv1 = new BufferedStream(fv1))
+				using (BufferedStream fbv2 = new BufferedStream(fv2))
+				{
+					zipMtime = File.GetLastWriteTime(srcV2);
+					ZipReadFile z1 = new ZipReadFile(fbv1);
+					ZipReadFile z2 = new ZipReadFile(fbv2);
+					Stopwatch startRepTime = Stopwatch.StartNew();
+					Replicate(z1, z2, fdst);
+					startRepTime.Stop();
+					logger.Info("Replication done in {0}", startRepTime.Elapsed);
+				}
+			}
 
 			if (dst != dstWork)
 			{
 				File.Replace(dstWork, dst, null);
 			}
 
-            File.SetLastWriteTime(dst, zipMtime);
+			File.SetLastWriteTime(dst, zipMtime);
 
-            startTime.Stop();
-            logger.Info("Processing {0}", startTime.Elapsed);
-        }
+			startTime.Stop();
+			logger.Info("Processing {0}", startTime.Elapsed);
+		}
 
 		/// <summary>
 		/// Update in-place with fuzzy zip structure
 		/// </summary>
 		public static async Task ReplicateUpdateFuzzy(string src, string dst)
 		{
-            logger.Info("Processing {0} to update from {1}", dst, src);
-            Stopwatch startTime = Stopwatch.StartNew();
-            DateTime zipMtime;
+			logger.Info("Processing {0} to update from {1}", dst, src);
+			Stopwatch startTime = Stopwatch.StartNew();
+			DateTime zipMtime;
 
-            FileStreamOptions readOpts = StreamUtil.MakeReadAsyncOpts();
-            FileStreamOptions writeOpts = StreamUtil.MakeWriteAsyncOpts(FileMode.Open, access: FileAccess.ReadWrite);
+			FileStreamOptions readOpts = StreamUtil.MakeReadAsyncOpts();
+			FileStreamOptions writeOpts = StreamUtil.MakeWriteAsyncOpts(FileMode.Open, access: FileAccess.ReadWrite);
 
-            using (MeasuringStream fsrc = new MeasuringStream(new FileStream(src, readOpts), StreamPurpose.Source))
-            using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, writeOpts), StreamPurpose.Target))
-            {
-                using (BufferedStream fbsrc = new BufferedStream(fsrc))
-                using (BufferedStream fbdst = new BufferedStream(fdst))
-                {
-                    zipMtime = File.GetLastWriteTime(src);
+			using (MeasuringStream fsrc = new MeasuringStream(new FileStream(src, readOpts), StreamPurpose.Source))
+			using (MeasuringStream fdst = new MeasuringStream(new FileStream(dst, writeOpts), StreamPurpose.Target))
+			{
+				using (BufferedStream fbsrc = new BufferedStream(fsrc))
+				using (BufferedStream fbdst = new BufferedStream(fdst))
+				{
+					zipMtime = File.GetLastWriteTime(src);
 
 					var zsrcTask = ZipReadFile.OpenAsync(fbsrc);
 					var zdstTask = ZipReadFile.OpenAsync(fbdst);
 
-                    ZipReadFile zsrc = await zsrcTask;
+					ZipReadFile zsrc = await zsrcTask;
 					ZipReadFile zdst = await zdstTask;
-                    logger.Info("Replicating {0}", src);
-                    Stopwatch startRepTime = Stopwatch.StartNew();
-                    await ReplicateFuzzy(zsrc, zdst, fbdst);
-                    startRepTime.Stop();
-                    logger.Info("Replication {0} done in {1}", dst, startRepTime.Elapsed);
-                }
-            }
-            File.SetLastWriteTime(dst, zipMtime);
+					logger.Info("Replicating {0}", src);
+					Stopwatch startRepTime = Stopwatch.StartNew();
+					await ReplicateFuzzy(zsrc, zdst, fbdst);
+					startRepTime.Stop();
+					logger.Info("Replication {0} done in {1}", dst, startRepTime.Elapsed);
+				}
+			}
+			File.SetLastWriteTime(dst, zipMtime);
 
-            startTime.Stop();
-            logger.Info("Processing {0} done in {1}", dst, startTime.Elapsed);
-        }
+			startTime.Stop();
+			logger.Info("Processing {0} done in {1}", dst, startTime.Elapsed);
+		}
 
 
-        /// <summary>
-        /// Replicate using FileCache
-        /// </summary>
-        public static void Replicate(ZipReadFile z, FileCache fc, Stream fsOut, DateTime zipMtime)
+		/// <summary>
+		/// Replicate using FileCache
+		/// </summary>
+		public static void Replicate(ZipReadFile z, FileCache fc, Stream fsOut, DateTime zipMtime)
 		{
 			var zEntries = z.CDR.Entries;
 			zEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
@@ -252,10 +252,10 @@ namespace PakFileCache
 
 		readonly struct Segment
 		{
-            public Segment(string n, uint s, uint e) { name = n; start = s; end = e; }
-            public Segment(uint s, uint e) { name = null; start = s; end = e; }
+			public Segment(string n, uint s, uint e) { name = n; start = s; end = e; }
+			public Segment(uint s, uint e) { name = null; start = s; end = e; }
 
-            public string name { get; }
+			public string name { get; }
 			public uint start { get; }
 			public uint end { get; }
 
@@ -266,72 +266,72 @@ namespace PakFileCache
 			public Segment WithEnd(uint e) { return new Segment(name, start, e); }
 			public Segment WithStart(uint s) { return new Segment(name, s, end); }
 
-            //bool Equals(Segment other)
-            //{
-            //	return name == other.name && start == other.start && end == other.end;
-            //}
+			//bool Equals(Segment other)
+			//{
+			//	return name == other.name && start == other.start && end == other.end;
+			//}
 
-            public override string ToString()
-            {
-                return $"{{{start}:{end}}}; {name}";
-            }
-        }
+			public override string ToString()
+			{
+				return $"{{{start}:{end}}}; {name}";
+			}
+		}
 
 		class SegmentsList
 		{
-            private List<Segment> segments = new List<Segment>
-            {
-                new Segment(0, 0)
-            };
+			private List<Segment> segments = new List<Segment>
+			{
+				new Segment(0, 0)
+			};
 			public List<Segment> Segments => segments;
 			public int Count => segments.Count;
-            public Segment this[int index] 
+			public Segment this[int index]
 			{
-                get => segments[index];
-                set => segments[index] = value;
-            }
+				get => segments[index];
+				set => segments[index] = value;
+			}
 
 			public void Add(Segment segment) => segments.Add(segment);
 
-            public void MergeHoles()
-            {
-                Debug.Assert(segments.Count > 0);
-                var merged = new List<Segment>(segments.Count) { segments[0] };
-                for (int i = 1; i < segments.Count; i++)
-                {
-                    var prev = merged[merged.Count - 1];
-                    var seg = segments[i];
-                    Debug.Assert(prev.end == seg.start);
-                    if (prev.IsHole && seg.IsHole)
-                    {
-                        merged[merged.Count - 1] = prev.WithEnd(seg.end);
-                    }
-                    else
-                    {
-                        merged.Add(seg);
-                    }
-                }
+			public void MergeHoles()
+			{
+				Debug.Assert(segments.Count > 0);
+				var merged = new List<Segment>(segments.Count) { segments[0] };
+				for (int i = 1; i < segments.Count; i++)
+				{
+					var prev = merged[merged.Count - 1];
+					var seg = segments[i];
+					Debug.Assert(prev.end == seg.start);
+					if (prev.IsHole && seg.IsHole)
+					{
+						merged[merged.Count - 1] = prev.WithEnd(seg.end);
+					}
+					else
+					{
+						merged.Add(seg);
+					}
+				}
 				segments = merged;
-            }
+			}
 
 			public Segment MakeExpandedHole(int iseg)
 			{
-                Segment hole = segments[iseg].MakeHole();
-                if (iseg > 0 && segments[iseg - 1].IsHole)
-                {
-                    Debug.Assert(segments[iseg - 1].end == hole.start);
-                    hole = hole.WithStart(segments[iseg - 1].start);
+				Segment hole = segments[iseg].MakeHole();
+				if (iseg > 0 && segments[iseg - 1].IsHole)
+				{
+					Debug.Assert(segments[iseg - 1].end == hole.start);
+					hole = hole.WithStart(segments[iseg - 1].start);
 					segments.RemoveAt(iseg - 1);
 					iseg--;
-                }
-                if (iseg + 1 < segments.Count && segments[iseg + 1].IsHole)
-                {
-                    Debug.Assert(segments[iseg + 1].start == hole.end);
-                    hole = hole.WithEnd(segments[iseg + 1].end);
-                }
+				}
+				if (iseg + 1 < segments.Count && segments[iseg + 1].IsHole)
+				{
+					Debug.Assert(segments[iseg + 1].start == hole.end);
+					hole = hole.WithEnd(segments[iseg + 1].end);
+				}
 				segments[iseg] = hole;
 				return hole;
-            }
+			}
 
 			public int FindHole(uint size)
 			{
@@ -357,7 +357,7 @@ namespace PakFileCache
 					segments.Insert(ihole, seg);
 					Debug.Assert(segments[ihole + 1].Equals(hole));
 					segments[ihole + 1] = hole.WithStart(seg.end);
-                }
+				}
 				else
 				{
 					segments[ihole] = seg;
@@ -368,7 +368,7 @@ namespace PakFileCache
 			{
 				var last = segments.Last();
 
-                if (last.IsHole)
+				if (last.IsHole)
 				{
 					if (last.Size < size)
 					{
@@ -378,8 +378,8 @@ namespace PakFileCache
 				else
 				{
 					segments.Add(new Segment(null, last.end, last.end + size));
-                    last = segments.Last();
-                }
+					last = segments.Last();
+				}
 
 				Debug.Assert(last.IsHole && last.Size >= size);
 				return last;
@@ -387,7 +387,7 @@ namespace PakFileCache
 
 			public Segment PushSegment(Segment seg)
 			{
-                var prev = segments[segments.Count - 1];
+				var prev = segments[segments.Count - 1];
 				Debug.Assert(prev.end <= seg.start);
 
 				if (prev.end < seg.start)
@@ -398,36 +398,36 @@ namespace PakFileCache
 					}
 					else
 					{
-                        segments.Add(new Segment(prev.end, seg.start));
-                        prev = segments[segments.Count - 1];
-                    }
+						segments.Add(new Segment(prev.end, seg.start));
+						prev = segments[segments.Count - 1];
+					}
 				}
 
-                Debug.Assert(prev.end == seg.start);
+				Debug.Assert(prev.end == seg.start);
 				Add(seg);
 				return seg;
-            }
-        }
+			}
+		}
 
 		public static async Task ReplicateFuzzy(ZipReadFile zsrc, ZipReadFile zdst, Stream fsOut)
-        {
+		{
 			var zsrcEntries = zsrc.CDR.Entries;
-            zsrcEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
+			zsrcEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
-            var zdstEntries = zdst.CDR.Entries;
-            zdstEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
+			var zdstEntries = zdst.CDR.Entries;
+			zdstEntries.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 			var segments = new SegmentsList();
-            for (int i = 0; i < zdstEntries.Count; ++i)
+			for (int i = 0; i < zdstEntries.Count; ++i)
 			{
 				var entry = zdstEntries[i];
-                segments.PushSegment(new Segment(entry.FileName, entry.localHeaderOffset, entry.localHeaderOffset + entry.FullRecordSize));
-            }
-            
-            List<CDRFileHeader> toKeepInDstCdr = new List<CDRFileHeader>(zdstEntries.Count);
-            List<CDRFileHeader> toUpdateFromSrcCdr = new List<CDRFileHeader>(zsrcEntries.Count);
-            foreach (var rec in zdstEntries)
-            {
+				segments.PushSegment(new Segment(entry.FileName, entry.localHeaderOffset, entry.localHeaderOffset + entry.FullRecordSize));
+			}
+
+			List<CDRFileHeader> toKeepInDstCdr = new List<CDRFileHeader>(zdstEntries.Count);
+			List<CDRFileHeader> toUpdateFromSrcCdr = new List<CDRFileHeader>(zsrcEntries.Count);
+			foreach (var rec in zdstEntries)
+			{
 				CDRFileHeader srcRec;
 				if (zsrc.CDR.Files.TryGetValue(rec.FileName, out srcRec))
 				{
@@ -448,30 +448,30 @@ namespace PakFileCache
 				{
 					// to remove, fall through
 				}
-				
+
 				int idx = segments.Segments.FindIndex(s => s.name == rec.FileName);
 				Debug.Assert(idx >= 0);
-                var seg = segments[idx];
+				var seg = segments[idx];
 				segments[idx] = seg.MakeHole();
 			}
 			foreach (var rec in zsrcEntries)
 			{
-                if (!zdst.CDR.Files.ContainsKey(rec.FileName))
+				if (!zdst.CDR.Files.ContainsKey(rec.FileName))
 				{
-                    toUpdateFromSrcCdr.Add(rec);
+					toUpdateFromSrcCdr.Add(rec);
 				}
-            }
-            toUpdateFromSrcCdr.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
+			}
+			toUpdateFromSrcCdr.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 
-            // merge holes
-            segments.MergeHoles();
+			// merge holes
+			segments.MergeHoles();
 
 
-            byte[] localHeaderBuf = new byte[LocalFileHeader.SIZE];
-            byte[] fileNameBuf = new byte[256];
+			byte[] localHeaderBuf = new byte[LocalFileHeader.SIZE];
+			byte[] fileNameBuf = new byte[256];
 
-            List<CDRFileHeader> newCdr = new List<CDRFileHeader>(zsrcEntries.Count);
+			List<CDRFileHeader> newCdr = new List<CDRFileHeader>(zsrcEntries.Count);
 
 			var srcStream = zsrc.Stream;
 			foreach (var srcRec in toUpdateFromSrcCdr)
@@ -510,9 +510,9 @@ namespace PakFileCache
 
 				var dstRec = new CDRFileHeader(srcRec, seg.start);
 				newCdr.Add(dstRec);
-            }
+			}
 			newCdr.AddRange(toKeepInDstCdr);
-            newCdr.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
+			newCdr.Sort((a, b) => a.localHeaderOffset.CompareTo(b.localHeaderOffset));
 
 			Debug.Assert(newCdr.Count == zsrc.CDR.Entries.Count);
 
@@ -523,7 +523,7 @@ namespace PakFileCache
 				{
 					continue;
 				}
-                cdrStart = segments[i].end;
+				cdrStart = segments[i].end;
 				break;
 			}
 
@@ -531,49 +531,49 @@ namespace PakFileCache
 
 			byte[] cdrBuf = WriteCdrBytes(newCdr, cdrStart, zsrc.CDR.Comment);
 			await fsOut.WriteAsync(cdrBuf);
-            fsOut.SetLength(fsOut.Position);
-        }
+			fsOut.SetLength(fsOut.Position);
+		}
 
 		static byte[] WriteCdrBytes(List<CDRFileHeader> newCdr, uint cdrStart, byte[] comment)
 		{
 			int capacity = 0;
-            foreach (var entry in newCdr)
+			foreach (var entry in newCdr)
 			{
 				capacity += (int)entry.CdrRecordSize;
 			}
 			capacity += (int)CDREnd.SIZE;
 			if (comment != null) capacity += comment.Length;
 
-            using (MemoryStream cdrMs = new MemoryStream(capacity))
-            {
-                using (BinaryWriter bw = new BinaryWriter(cdrMs, Encoding.ASCII, true))
-                {
-                    Debug.Assert(cdrMs.Position + cdrStart == cdrStart);
-                    foreach (var entry in newCdr)
-                    {
-                        entry.Write(bw);
-                    }
-                    uint cdrEnd = (uint)cdrMs.Position + cdrStart;
+			using (MemoryStream cdrMs = new MemoryStream(capacity))
+			{
+				using (BinaryWriter bw = new BinaryWriter(cdrMs, Encoding.ASCII, true))
+				{
+					Debug.Assert(cdrMs.Position + cdrStart == cdrStart);
+					foreach (var entry in newCdr)
+					{
+						entry.Write(bw);
+					}
+					uint cdrEnd = (uint)cdrMs.Position + cdrStart;
 
-                    Debug.Assert(newCdr.Count <= ushort.MaxValue);
-                    CDREnd end = new CDREnd(cdrStart, cdrEnd - cdrStart, (ushort)newCdr.Count, comment);
-                    end.Write(bw);
-                    if (comment != null)
-                    {
-                        bw.Write(comment);
-                    }
-                }
+					Debug.Assert(newCdr.Count <= ushort.MaxValue);
+					CDREnd end = new CDREnd(cdrStart, cdrEnd - cdrStart, (ushort)newCdr.Count, comment);
+					end.Write(bw);
+					if (comment != null)
+					{
+						bw.Write(comment);
+					}
+				}
 
 				return cdrMs.GetBuffer();
-            }
-        }
+			}
+		}
 
 
-        static CDRFileHeader FindSameFile(CDRFileHeader query, CDR cdr, out string debugReason)
+		static CDRFileHeader FindSameFile(CDRFileHeader query, CDR cdr, out string debugReason)
 		{
 			debugReason = "not found";
 			CDRFileHeader src;
-			if (cdr.Files.TryGetValue(query.FileName, out src)) 
+			if (cdr.Files.TryGetValue(query.FileName, out src))
 			{
 				if (IsSameFile(src, query, out debugReason))
 				{
@@ -586,25 +586,25 @@ namespace PakFileCache
 
 		static bool IsSameFile(CDRFileHeader src, CDRFileHeader query, out string debugReason)
 		{
-            if (!src.desc.Equals(query.desc)) { debugReason = "size or crc"; return false; }
-            if (!(src.modTime == query.modTime)) { debugReason = "nLastModTime"; return false; }
-            if (!(src.modDate == query.modDate)) { debugReason = "nLastModDate"; return false; }
-            if (!(src.createVersion == query.createVersion)) { debugReason = "nVersionMadeBy"; return false; }
-            if (!(src.extractVersion == query.extractVersion)) { debugReason = "nVersionNeeded"; return false; }
-            if (!(src.flags == query.flags)) { debugReason = "nFlags"; return false; }
-            if (!(src.method == query.method)) { debugReason = "nMethod"; return false; }
-            if (!(src.fileNameSize == query.fileNameSize)) { debugReason = "nFileNameLength"; return false; }
-            if (!(src.extraFieldSize == query.extraFieldSize)) { debugReason = "nExtraFieldLength"; return false; }
-            if (!(src.commentLength == query.commentLength)) { debugReason = "nFileCommentLength"; return false; }
-            if (!(src.diskNumberStart == query.diskNumberStart)) { debugReason = "nDiskNumberStart"; return false; }
-            if (!(src.internalFileAttributes == query.internalFileAttributes)) { debugReason = "nAttrInternal"; return false; }
-            if (!(src.externalFileAttributes == query.externalFileAttributes)) { debugReason = "lAttrExternal"; return false; }
-            if (!src.filenameBytes.SequenceEqual(query.filenameBytes)) { debugReason = "filenameBytes"; return false; }
-            if (!src.extraField.SequenceEqual(query.extraField)) { debugReason = "extraField"; return false; }
-            if (!src.comment.SequenceEqual(query.comment)) { debugReason = "comment"; return false; }
+			if (!src.desc.Equals(query.desc)) { debugReason = "size or crc"; return false; }
+			if (!(src.modTime == query.modTime)) { debugReason = "nLastModTime"; return false; }
+			if (!(src.modDate == query.modDate)) { debugReason = "nLastModDate"; return false; }
+			if (!(src.createVersion == query.createVersion)) { debugReason = "nVersionMadeBy"; return false; }
+			if (!(src.extractVersion == query.extractVersion)) { debugReason = "nVersionNeeded"; return false; }
+			if (!(src.flags == query.flags)) { debugReason = "nFlags"; return false; }
+			if (!(src.method == query.method)) { debugReason = "nMethod"; return false; }
+			if (!(src.fileNameSize == query.fileNameSize)) { debugReason = "nFileNameLength"; return false; }
+			if (!(src.extraFieldSize == query.extraFieldSize)) { debugReason = "nExtraFieldLength"; return false; }
+			if (!(src.commentLength == query.commentLength)) { debugReason = "nFileCommentLength"; return false; }
+			if (!(src.diskNumberStart == query.diskNumberStart)) { debugReason = "nDiskNumberStart"; return false; }
+			if (!(src.internalFileAttributes == query.internalFileAttributes)) { debugReason = "nAttrInternal"; return false; }
+			if (!(src.externalFileAttributes == query.externalFileAttributes)) { debugReason = "lAttrExternal"; return false; }
+			if (!src.filenameBytes.SequenceEqual(query.filenameBytes)) { debugReason = "filenameBytes"; return false; }
+			if (!src.extraField.SequenceEqual(query.extraField)) { debugReason = "extraField"; return false; }
+			if (!src.comment.SequenceEqual(query.comment)) { debugReason = "comment"; return false; }
 			debugReason = "same";
-            return true;
-        }
+			return true;
+		}
 
 		static bool CompareFilenameBuffer(byte[] fileNameBuf, int fileNameLength, CDRFileHeader rec)
 		{

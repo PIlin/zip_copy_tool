@@ -38,22 +38,22 @@ namespace PakFileCache
 			cdrOffset = br.ReadUInt32();
 			commentSize = br.ReadUInt16();
 		}
-        public CDREnd(BinaryReader br, uint sig)
-        {
-            signature = sig;
-            if (signature != SIGNATURE)
-                throw new FileFormatException("Unexpected signature");
-            diskNumber = br.ReadUInt16();
-            diskStart = br.ReadUInt16();
-            numEntriesThisDisk = br.ReadUInt16();
-            numEntriesTotal = br.ReadUInt16();
-            cdrSize = br.ReadUInt32();
-            cdrOffset = br.ReadUInt32();
-            commentSize = br.ReadUInt16();
-        }
+		public CDREnd(BinaryReader br, uint sig)
+		{
+			signature = sig;
+			if (signature != SIGNATURE)
+				throw new FileFormatException("Unexpected signature");
+			diskNumber = br.ReadUInt16();
+			diskStart = br.ReadUInt16();
+			numEntriesThisDisk = br.ReadUInt16();
+			numEntriesTotal = br.ReadUInt16();
+			cdrSize = br.ReadUInt32();
+			cdrOffset = br.ReadUInt32();
+			commentSize = br.ReadUInt16();
+		}
 
 
-        public CDREnd(uint offset, uint size, ushort numEntries, byte[] comment)
+		public CDREnd(uint offset, uint size, ushort numEntries, byte[] comment)
 		{
 			signature = SIGNATURE;
 			diskNumber = 0;
@@ -62,33 +62,33 @@ namespace PakFileCache
 			numEntriesTotal = numEntries;
 			cdrSize = size;
 			cdrOffset = offset;
-            commentSize = (ushort)(comment != null ? comment.Length : 0);
-        }
+			commentSize = (ushort)(comment != null ? comment.Length : 0);
+		}
 
 		public void Write(BinaryWriter bw)
 		{
-            bw.Write((UInt32)signature);
-            bw.Write((UInt16)diskNumber);
-            bw.Write((UInt16)diskStart);
-            bw.Write((UInt16)numEntriesThisDisk);
-            bw.Write((UInt16)numEntriesTotal);
-            bw.Write((UInt32)cdrSize);
-            bw.Write((UInt32)cdrOffset);
-            bw.Write((UInt16)commentSize);
-        }
+			bw.Write((UInt32)signature);
+			bw.Write((UInt16)diskNumber);
+			bw.Write((UInt16)diskStart);
+			bw.Write((UInt16)numEntriesThisDisk);
+			bw.Write((UInt16)numEntriesTotal);
+			bw.Write((UInt32)cdrSize);
+			bw.Write((UInt32)cdrOffset);
+			bw.Write((UInt16)commentSize);
+		}
 	}
 
 	[Flags]
 	public enum EGPFlags : ushort
 	{
 		Encrypted = 1 << 0,
-        CompressOption1 = 1 << 1,
-        CompressOption2 = 1 << 2,
-        UseDataDescryptor = 1 << 3,
-        CompressedPatch = 1 << 5,
-        StrongEncryption = 1 << 6,
-        Utf8Filename = 1 << 11
-    };
+		CompressOption1 = 1 << 1,
+		CompressOption2 = 1 << 2,
+		UseDataDescryptor = 1 << 3,
+		CompressedPatch = 1 << 5,
+		StrongEncryption = 1 << 6,
+		Utf8Filename = 1 << 11
+	};
 
 	public enum ECompressionMethon : ushort
 	{
@@ -103,8 +103,8 @@ namespace PakFileCache
 		Deflate = 8, // The file is Deflated
 		Deflate64 = 9, // Enhanced Deflating using Deflate64(tm)
 		ImplodePKWARE = 10, // PKWARE Data Compression Library Imploding (old IBM TERSE)
-        BZIP2 = 12, // File is compressed using BZIP2 algorithm
-        LZMA = 14, // LZMA
+		BZIP2 = 12, // File is compressed using BZIP2 algorithm
+		LZMA = 14, // LZMA
 		IBM_zOS = 16, // IBM z/OS CMPSC Compression
 		IBM_Terse = 18, // File is compressed using IBM TERSE (new)
 		IBM_LZ77 = 19, // IBM LZ77 z Architecture
@@ -115,30 +115,30 @@ namespace PakFileCache
 		WawPack = 97, // WavPack compressed data
 		PPMd = 98, // PPMd version I, Rev 1
 		AEx = 99, // AE-x encryption marker (see APPENDIX E)
-    };
+	};
 
 	public enum EVersion : ushort
 	{
 		Default = 10, // Default value
 		VolumeLabel = 11, // File is a volume label
 		Folder = 20, // File is a folder (directory)
-        CompressedDeflate = 20, // File is compressed using Deflate compression
-        EncryptedPKWARE = 20, // File is encrypted using traditional PKWARE encryption
-        CompressedDeflate64 = 21, // File is compressed using Deflate64(tm)
-        CompressedDCLImplode = 25, // File is compressed using PKWARE DCL Implode 
-        PatchDataSet = 27, // File is a patch data set 
+		CompressedDeflate = 20, // File is compressed using Deflate compression
+		EncryptedPKWARE = 20, // File is encrypted using traditional PKWARE encryption
+		CompressedDeflate64 = 21, // File is compressed using Deflate64(tm)
+		CompressedDCLImplode = 25, // File is compressed using PKWARE DCL Implode 
+		PatchDataSet = 27, // File is a patch data set 
 		Zip64Extensions = 45, // File uses ZIP64 format extensions
 		CompressedBZIP2 = 46, // File is compressed using BZIP2 compression*
-        EncryptedDES = 50, // File is encrypted using DES
-        Encrypted3DES = 50, // File is encrypted using 3DES
-        EncryptedRC2 = 50, // File is encrypted using original RC2 encryption
-        EncryptedRC4 = 50, // File is encrypted using RC4 encryption
-        EncryptedAES = 51, // File is encrypted using AES encryption
-        EncryptedRC2Corrected = 51, // File is encrypted using corrected RC2 encryption**
-        EncryptedRC2_64 = 52, // File is encrypted using corrected RC2-64 encryption**
-        EncryptedNonOAEP = 61, // File is encrypted using non-OAEP key wrapping***
-        EncryptedCDR = 62, // Central directory encryption
-        CompressedLZMA = 63, // File is compressed using LZMA
+		EncryptedDES = 50, // File is encrypted using DES
+		Encrypted3DES = 50, // File is encrypted using 3DES
+		EncryptedRC2 = 50, // File is encrypted using original RC2 encryption
+		EncryptedRC4 = 50, // File is encrypted using RC4 encryption
+		EncryptedAES = 51, // File is encrypted using AES encryption
+		EncryptedRC2Corrected = 51, // File is encrypted using corrected RC2 encryption**
+		EncryptedRC2_64 = 52, // File is encrypted using corrected RC2-64 encryption**
+		EncryptedNonOAEP = 61, // File is encrypted using non-OAEP key wrapping***
+		EncryptedCDR = 62, // Central directory encryption
+		CompressedLZMA = 63, // File is compressed using LZMA
 		CompressedPPMD = 63, // File is compressed using PPMd+
 		EncryptedBlowfish = 63, // File is encrypted using Blowfish
 		EncryptedTwofish = 63, // File is encrypted using Twofish
@@ -172,7 +172,7 @@ namespace PakFileCache
 
 	public class DataDescriptor : IEquatable<DataDescriptor>
 	{
-		public const long SIZE = 3*4;
+		public const long SIZE = 3 * 4;
 
 		public readonly uint crc32 = 0;
 		public readonly uint sizeCompressed = 0;
@@ -194,15 +194,15 @@ namespace PakFileCache
 		{
 			bw.Write((UInt32)crc32);
 			bw.Write((UInt32)sizeCompressed);
-            bw.Write((UInt32)sizeUncompressed);
-        }
-    }
+			bw.Write((UInt32)sizeUncompressed);
+		}
+	}
 
 
 	public class CDRFileHeader
 	{
 		public const uint SIGNATURE = 0x02014b50;
-		public const long SIZE = 4 + 11*2 + 2*4 + DataDescriptor.SIZE;
+		public const long SIZE = 4 + 11 * 2 + 2 * 4 + DataDescriptor.SIZE;
 
 		public readonly uint signature;
 		public readonly EVersionCreator createVersion;
@@ -232,7 +232,7 @@ namespace PakFileCache
 		public uint FullRecordSize => (uint)LocalFileHeader.SIZE + fileNameSize + extraFieldSize + desc.sizeCompressed;
 
 
-        public CDRFileHeader(BinaryReader br)
+		public CDRFileHeader(BinaryReader br)
 		{
 			signature = br.ReadUInt32();
 			if (signature != SIGNATURE)
@@ -261,52 +261,52 @@ namespace PakFileCache
 
 		public CDRFileHeader(CDRFileHeader h)
 		{
-            signature = h.signature;
-            createVersion = h.createVersion;
-            extractVersion = h.extractVersion;
-            flags = h.flags;
-            method = h.method;
-            modTime = h.modTime;
-            modDate = h.modDate;
-            desc = h.desc;
-            fileNameSize = h.fileNameSize;
-            extraFieldSize = h.extraFieldSize;
-            commentLength = h.commentLength;
-            diskNumberStart = h.diskNumberStart;
-            internalFileAttributes = h.internalFileAttributes;
-            externalFileAttributes = h.externalFileAttributes;
-            localHeaderOffset = h.localHeaderOffset;
-            filenameBytes = h.filenameBytes;
-            extraField = h.extraField;
-            comment = h.comment;
-            FileName = h.FileName;
-        }
+			signature = h.signature;
+			createVersion = h.createVersion;
+			extractVersion = h.extractVersion;
+			flags = h.flags;
+			method = h.method;
+			modTime = h.modTime;
+			modDate = h.modDate;
+			desc = h.desc;
+			fileNameSize = h.fileNameSize;
+			extraFieldSize = h.extraFieldSize;
+			commentLength = h.commentLength;
+			diskNumberStart = h.diskNumberStart;
+			internalFileAttributes = h.internalFileAttributes;
+			externalFileAttributes = h.externalFileAttributes;
+			localHeaderOffset = h.localHeaderOffset;
+			filenameBytes = h.filenameBytes;
+			extraField = h.extraField;
+			comment = h.comment;
+			FileName = h.FileName;
+		}
 
-        public CDRFileHeader(CDRFileHeader h, uint newLocalHeaderOffset)
-        {
-            signature = h.signature;
-            createVersion = h.createVersion;
-            extractVersion = h.extractVersion;
-            flags = h.flags;
-            method = h.method;
-            modTime = h.modTime;
-            modDate = h.modDate;
-            desc = h.desc;
-            fileNameSize = h.fileNameSize;
-            extraFieldSize = h.extraFieldSize;
-            commentLength = h.commentLength;
-            diskNumberStart = h.diskNumberStart;
-            internalFileAttributes = h.internalFileAttributes;
-            externalFileAttributes = h.externalFileAttributes;
-            localHeaderOffset = newLocalHeaderOffset;
-            filenameBytes = h.filenameBytes;
-            extraField = h.extraField;
-            comment = h.comment;
-            FileName = h.FileName;
-        }
+		public CDRFileHeader(CDRFileHeader h, uint newLocalHeaderOffset)
+		{
+			signature = h.signature;
+			createVersion = h.createVersion;
+			extractVersion = h.extractVersion;
+			flags = h.flags;
+			method = h.method;
+			modTime = h.modTime;
+			modDate = h.modDate;
+			desc = h.desc;
+			fileNameSize = h.fileNameSize;
+			extraFieldSize = h.extraFieldSize;
+			commentLength = h.commentLength;
+			diskNumberStart = h.diskNumberStart;
+			internalFileAttributes = h.internalFileAttributes;
+			externalFileAttributes = h.externalFileAttributes;
+			localHeaderOffset = newLocalHeaderOffset;
+			filenameBytes = h.filenameBytes;
+			extraField = h.extraField;
+			comment = h.comment;
+			FileName = h.FileName;
+		}
 
 
-        public string FormatLastModTime()
+		public string FormatLastModTime()
 		{
 			ushort t = modTime;
 			int hour = t >> 11;
@@ -328,29 +328,29 @@ namespace PakFileCache
 		{
 			bw.Write(signature);
 			bw.Write((UInt16)createVersion);
-            bw.Write((UInt16)extractVersion);
-            bw.Write((UInt16)flags);
-            bw.Write((UInt16)method);
-            bw.Write((UInt16)modTime);
-            bw.Write((UInt16)modDate);
+			bw.Write((UInt16)extractVersion);
+			bw.Write((UInt16)flags);
+			bw.Write((UInt16)method);
+			bw.Write((UInt16)modTime);
+			bw.Write((UInt16)modDate);
 			desc.Write(bw);
-            bw.Write((UInt16)fileNameSize);
-            bw.Write((UInt16)extraFieldSize);
-            bw.Write((UInt16)commentLength);
-            bw.Write((UInt16)diskNumberStart);
-            bw.Write((UInt16)internalFileAttributes);
-            bw.Write((UInt32)externalFileAttributes);
-            bw.Write((UInt32)localHeaderOffset);
+			bw.Write((UInt16)fileNameSize);
+			bw.Write((UInt16)extraFieldSize);
+			bw.Write((UInt16)commentLength);
+			bw.Write((UInt16)diskNumberStart);
+			bw.Write((UInt16)internalFileAttributes);
+			bw.Write((UInt32)externalFileAttributes);
+			bw.Write((UInt32)localHeaderOffset);
 
 			bw.Write(filenameBytes);
 			bw.Write(extraField);
 			bw.Write(comment);
-        }
+		}
 		public override string ToString()
 		{
 			return $"{localHeaderOffset}: {FileName}";
-        }
-    }
+		}
+	}
 
 	public class LocalFileHeader
 	{
@@ -422,11 +422,11 @@ namespace PakFileCache
 			{
 				Files = entries.ToDictionary(x => x.FileName);
 			}
-			catch(ArgumentException ex)
+			catch (ArgumentException ex)
 			{
-                throw new FileFormatException($"Source archive has multiple files with the same name", ex);
-            }               
-        }
+				throw new FileFormatException($"Source archive has multiple files with the same name", ex);
+			}
+		}
 	}
 
 	public class ZipReadFile
@@ -439,14 +439,14 @@ namespace PakFileCache
 
 		public static async Task<ZipReadFile> OpenAsync(Stream stream)
 		{
-            CDRLoadResult cdr = await LoadCDR(stream);
+			CDRLoadResult cdr = await LoadCDR(stream);
 			return new ZipReadFile(stream, cdr.cdr, cdr.cdrOffset);
-        }
+		}
 
 		public ZipReadFile(Stream stream)
 		{
 			Stream = stream;
-            CDRLoadResult cdr = LoadCDR(stream).Result;
+			CDRLoadResult cdr = LoadCDR(stream).Result;
 			CDR = cdr.cdr;
 			CDROffset = cdr.cdrOffset;
 		}
@@ -471,11 +471,11 @@ namespace PakFileCache
 			long fileSize = bs.Length;
 			if (debugLog) logger.Info($"File size {fileSize}");
 
-            CDREndResult cdrEndResult = await FindCDREnd(bs);
+			CDREndResult cdrEndResult = await FindCDREnd(bs);
 			CDREnd fileCDREnd = cdrEndResult.cdrEnd;
-            long commentStart = cdrEndResult.commentStart;
-            byte[] comment = cdrEndResult.comment;
-            if (debugLog)
+			long commentStart = cdrEndResult.commentStart;
+			byte[] comment = cdrEndResult.comment;
+			if (debugLog)
 			{
 				logger.Info("CDREnd {0:x} - {1:x} ({2:x})", commentStart - CDREnd.SIZE, commentStart, CDREnd.SIZE);
 				logger.Info("  .signature          {0:x}", fileCDREnd.signature);
@@ -498,7 +498,7 @@ namespace PakFileCache
 
 				if (debugLog) logger.Info("CDR {0:x} - {1:x} ({2:x})", cdrPos, cdrPosEnd, cdrPosEnd - cdrPos);
 
-                byte[] buffer = await StreamUtil.ReadBufferAsync(bs, null, (int)fileCDREnd.cdrSize);
+				byte[] buffer = await StreamUtil.ReadBufferAsync(bs, null, (int)fileCDREnd.cdrSize);
 				using (MemoryStream ms = new MemoryStream(buffer))
 				using (BinaryReader br = new BinaryReader(ms, Encoding.ASCII, true))
 				{
@@ -534,7 +534,7 @@ namespace PakFileCache
 					}
 				}
 			}
-			
+
 
 			return new CDRLoadResult()
 			{
@@ -558,13 +558,13 @@ namespace PakFileCache
 				throw new FileFormatException("File isn't big enough to contain a CDREnd structure");
 			}
 
-            CDREndResult result = new CDREndResult();
-            //CDREnd cdrEnd = null;
+			CDREndResult result = new CDREndResult();
+			//CDREnd cdrEnd = null;
 
 			// Check to see if this is ZIP file with no archive comment (the
 			// "end of central directory" structure should be the last item in the
 			// file if this is the case).
-            stream.Seek(-CDREnd.SIZE, SeekOrigin.End);
+			stream.Seek(-CDREnd.SIZE, SeekOrigin.End);
 			using (BinaryReader br = new BinaryReader(stream, Encoding.ASCII, true))
 			{
 				result.cdrEnd = CheckCDREnd(br, 0, out result.commentStart);
@@ -623,24 +623,24 @@ namespace PakFileCache
 						}
 					}
 				}
-                throw new FileFormatException("Couldn't find a CDREnd structure");
-            }
+				throw new FileFormatException("Couldn't find a CDREnd structure");
+			}
 		}
 
 		static CDREnd CheckCDREnd(BinaryReader br, ushort expectedCommentSize, out long commentStart)
 		{
-            commentStart = 0;
-            uint signature = br.ReadUInt32();
+			commentStart = 0;
+			uint signature = br.ReadUInt32();
 			if (signature == CDREnd.SIGNATURE)
 			{
-                CDREnd cdrEnd = new CDREnd(br, signature);
+				CDREnd cdrEnd = new CDREnd(br, signature);
 				if (cdrEnd.commentSize == expectedCommentSize)
 				{
 					commentStart = br.BaseStream.Position;
-                    return cdrEnd;
+					return cdrEnd;
 				}
-            }
+			}
 			return null;
-        }
+		}
 	}
 }
